@@ -35,19 +35,40 @@ export async function GET(request: NextRequest) {
       where.lotteryType = lotteryType;
     }
 
-    const [total, items] = await Promise.all([
-      prisma.lotteryDraw.count({ where }),
-      prisma.lotteryDraw.findMany({
-        where,
-        orderBy: { drawDate: 'desc' },
-        skip,
-        take: limitNum,
-      }),
-    ]);
+    let total = 0;
+    let items: DrawRecord[] = [];
+    try {
+      const [dbTotal, dbItems] = await Promise.all([
+        prisma.lotteryDraw.count({ where }),
+        prisma.lotteryDraw.findMany({
+          where,
+          orderBy: { drawDate: 'desc' },
+          skip,
+          take: limitNum,
+        }),
+      ]);
+      total = dbTotal;
+      items = dbItems.map(formatDrawRecord);
+    } catch (e) {
+      console.warn('Prisma DB error, falling back to raw data:', e);
+    }
+
+    if (items.length === 0) {
+      const rawData = require('../../../../../../draws_raw.json');
+      total = rawData.length;
+      items = rawData.slice(skip, skip + limitNum).map((d: any) => ({
+        id: String(d.drawId),
+        drawId: d.drawId,
+        lotteryType: d.lotteryType || 'POWER_655',
+        drawDate: d.drawDate,
+        numbers: d.numbers || [],
+        bonusNumber: d.bonusNumber || null,
+      }));
+    }
 
     return NextResponse.json({
       success: true,
-      data: items.map(formatDrawRecord),
+      data: items,
       pagination: {
         total,
         page: pageNum,
