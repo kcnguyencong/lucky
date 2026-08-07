@@ -1,0 +1,65 @@
+export interface DrawRecord {
+    id: string;
+    drawId: string;
+    lotteryType: string;
+    drawDate: Date | string;
+    numbers: number[];
+    bonusNumber?: number | null;
+}
+export interface FrequencyStat {
+    number: number;
+    appearances: number;
+    percentage: number;
+    lastDrawnAt: Date | string | null;
+    gapCount: number;
+}
+export interface GapStat {
+    number: number;
+    currentGap: number;
+    maxGap: number;
+    avgGap: number;
+    totalAppearances: number;
+}
+export interface PairStat {
+    pair: [number, number];
+    count: number;
+}
+export interface OverviewSummary {
+    totalDraws: number;
+    latestDraw: DrawRecord | null;
+    hottestNumber: FrequencyStat | null;
+    coldestNumber: FrequencyStat | null;
+    mostLaggingNumber: GapStat | null;
+    topPredictions: Array<{
+        number: number;
+        score: number;
+        reasoning: string;
+    }>;
+}
+/**
+ * Calculates frequency and gap metrics for all numbers (00 to 99) based on draw history.
+ */
+export declare function calculateFrequencyStats(draws: DrawRecord[], maxNumber?: number): FrequencyStat[];
+/**
+ * Calculates omission gap stats for all numbers (current gap, historical max gap, avg gap).
+ */
+export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: number): GapStat[];
+/**
+ * Calculates top co-occurring pairs of numbers.
+ */
+export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
+/**
+ * Predicts top N numbers most likely to appear in the next draw using a multi-factor scoring model:
+ * 1. Historical frequency weight (Recency & Frequency)
+ * 2. Omission gap elasticity (Numbers approaching or exceeding average gap score higher)
+ * 3. Recent momentum (Appearances in last 10 draws)
+ */
+export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
+    number: number;
+    score: number;
+    reasoning: string;
+}>;
+/**
+ * Generates overall summary stats for executive KPIs.
+ */
+export declare function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary;

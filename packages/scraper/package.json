@@ -1,0 +1,22 @@
+{
+  "name": "@lottery/scraper",
+  "version": "1.0.0",
+  "description": "Production-ready Web Scraper Module for historical lottery draw results",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "scrape": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@lottery/database": "file:../database",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
