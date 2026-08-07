@@ -1,7 +1,4 @@
 {
-  "$schema": "https://vercel.com/error-metadata",
-  "framework": "nextjs",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build --workspace=apps/web",
+  "buildCommand": "npm run build --workspace=packages/core && npm run build --workspace=packages/database && npm run build --workspace=apps/web",
   "outputDirectory": "apps/web/.next"
 }
