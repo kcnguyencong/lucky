@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=packages/scraper\" \"npm run dev --workspace=apps/web\"",
+    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:all": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\" \"npm run dev --workspace=packages/scraper\"",
     "build": "npm run build --workspaces",
     "scrape": "npm run scrape --workspace=packages/scraper",
     "db:push": "npm run db:push --workspace=packages/database",
