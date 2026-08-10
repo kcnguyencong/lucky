@@ -114,27 +114,8 @@ export function KPICards({ summary }: KPICardsProps) {
         </p>
       </div>
 
-      {/* CARD 2: Hottest Number */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-            <Flame className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline space-x-3">
-          <span className="text-3xl font-extrabold text-amber-400">
-            {summary.hottestNumber ? String(summary.hottestNumber.number).padStart(2, '0') : '--'}
-          </span>
-          <span className="text-sm text-slate-300 font-bold">
-            {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
-          </span>
-        </div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
-      </div>
-
-      {/* CARD 3: Dự Đoán Tổng Đề GĐB (Replaced Coldest/Lagging Lotto) */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60 relative overflow-hidden">
+      {/* CARD 2: Dự Đoán Tổng Đề GĐB */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-slate-700/60">
         <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/5 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-cyan-400">Dự Đoán Tổng Đề GĐB</span>
@@ -155,7 +136,7 @@ export function KPICards({ summary }: KPICardsProps) {
             </div>
           ))}
           {(!spSummary || spSummary.topTongPredictions.length === 0) && (
-            <span className="text-xs text-slate-500">Đang tính toán...</span>
+            <span className="text-xs text-slate-400">Đang tính toán...</span>
           )}
         </div>
         <p className="text-[10px] text-slate-500 mt-2.5 font-medium border-t border-slate-800/80 pt-1.5">
@@ -163,7 +144,7 @@ export function KPICards({ summary }: KPICardsProps) {
         </p>
       </div>
 
-      {/* CARD 4: Top 4 Predicted Numbers for Next Draw */}
+      {/* CARD 3: Top 4 Dự Đoán Lô */}
       <div className="bg-gradient-to-br from-indigo-950/40 to-purple-950/40 border border-indigo-500/30 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-indigo-500/50">
         <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
@@ -188,6 +169,25 @@ export function KPICards({ summary }: KPICardsProps) {
         <p className="text-xs text-indigo-400/80 mt-2 font-semibold">
           Kỳ tiếp theo • Lô tô thường
         </p>
+      </div>
+
+      {/* CARD 4: Số Lô Hot Nhất */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
+          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+            <Flame className="w-5 h-5" />
+          </div>
+        </div>
+        <div className="flex items-baseline space-x-3">
+          <span className="text-3xl font-extrabold text-amber-400">
+            {summary.hottestNumber ? String(summary.hottestNumber.number).padStart(2, '0') : '--'}
+          </span>
+          <span className="text-sm text-slate-300 font-bold">
+            {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
       </div>
 
       {/* CARD 5: Last Draw Validation */}
