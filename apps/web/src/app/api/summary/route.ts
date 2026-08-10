@@ -1,23 +1,50 @@
-import { NextResponse } from 'next/server';
-import { generateOverviewSummary } from '@lottery/core';
-import rawDraws from '../../../../draws_raw.json';
+import { NextRequest, NextResponse } from 'next/server';
+import { generateOverviewSummary, predictTopNumbers } from '@lottery/core';
+import { getMergedDraws } from '@/lib/liveScraper';
 
-function loadDraws() {
-  return (rawDraws as any[]).map((d: any) => ({
-    id: String(d.drawId),
-    drawId: d.drawId,
-    lotteryType: d.lotteryType || 'POWER_655',
-    drawDate: d.drawDate,
-    numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
-    bonusNumber: d.bonusNumber || null,
-  }));
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const draws = loadDraws();
+    const { searchParams } = new URL(request.url);
+    const refresh = searchParams.get('refresh') === 'true';
+
+    const draws = await getMergedDraws(refresh);
     const summary = generateOverviewSummary(draws);
-    return NextResponse.json({ success: true, data: summary });
+
+    // Calculate validation for the most recent draw (prediction accuracy)
+    let lastDrawValidation = null;
+    if (draws.length > 1) {
+      const latestDraw = draws[0];
+      const pastHistory = draws.slice(1);
+      
+      // Predict what the numbers would be for the latestDraw, using only pastHistory
+      const pastPredictions = predictTopNumbers(pastHistory, 4);
+      
+      const validatedPredictions = pastPredictions.map((pred) => {
+        const isHit = latestDraw.numbers.includes(pred.number);
+        return {
+          ...pred,
+          isHit,
+        };
+      });
+
+      const hitsCount = validatedPredictions.filter((p) => p.isHit).length;
+
+      lastDrawValidation = {
+        drawId: latestDraw.drawId,
+        drawDate: latestDraw.drawDate,
+        winningNumbers: latestDraw.numbers,
+        predictions: validatedPredictions,
+        hitsCount,
+      };
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...summary,
+        lastDrawValidation,
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

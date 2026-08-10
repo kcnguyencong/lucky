@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { KPICards } from '@/components/KPICards';
 import { NumberGridHeatmap } from '@/components/NumberGridHeatmap';
 import { DrawHistoryTable } from '@/components/DrawHistoryTable';
-import { Database, LineChart, Cpu, RefreshCw, BarChart2 } from 'lucide-react';
+import { RefreshCw, BarChart2 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -16,17 +16,26 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  const fetchDashboardData = async (page: number = 1) => {
-    setLoading(true);
+  const fetchDashboardData = async (page: number = 1, forceRefresh: boolean = false) => {
+    if (forceRefresh) {
+      setSyncing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
+      const queryParams = forceRefresh ? '?refresh=true' : '';
+      const drawsParams = forceRefresh ? `&refresh=true` : '';
+
       const [sumRes, freqRes, drawsRes] = await Promise.all([
-        fetch(`${API_BASE}/summary`).then((res) => res.json()),
-        fetch(`${API_BASE}/stats/frequency`).then((res) => res.json()),
-        fetch(`${API_BASE}/draws?page=${page}&limit=12`).then((res) => res.json()),
+        fetch(`${API_BASE}/summary${queryParams}`).then((res) => res.json()),
+        fetch(`${API_BASE}/stats/frequency${queryParams}`).then((res) => res.json()),
+        fetch(`${API_BASE}/draws?page=${page}&limit=12${drawsParams}`).then((res) => res.json()),
       ]);
 
       if (sumRes.success) setSummary(sumRes.data);
       if (freqRes.success) setFreqStats(freqRes.data);
+      
       if (drawsRes.success) {
         setDraws(drawsRes.data);
         setPagination({
@@ -39,6 +48,7 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard metrics from API backend:', err);
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -53,7 +63,7 @@ export default function DashboardPage() {
         <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-slate-800 gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+              <div className="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
                 <BarChart2 className="w-7 h-7" />
               </div>
               <div>
@@ -68,9 +78,17 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchDashboardData(pagination.page, true)}
+              disabled={syncing || loading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-indigo-800/50 text-white border border-indigo-500/30 shadow-lg shadow-indigo-900/30 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Đang cập nhật...' : 'Cập nhật dữ liệu'}
+            </button>
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              Fastify Backend Live
+              Serverless API Live
             </span>
           </div>
         </header>
@@ -88,7 +106,7 @@ export default function DashboardPage() {
           currentPage={pagination.page}
           totalPages={pagination.totalPages}
           onPageChange={(page) => fetchDashboardData(page)}
-          onRefresh={() => fetchDashboardData(pagination.page)}
+          onRefresh={() => fetchDashboardData(pagination.page, true)}
         />
       </div>
     </main>

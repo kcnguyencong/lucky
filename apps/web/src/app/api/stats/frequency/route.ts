@@ -1,21 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { calculateFrequencyStats } from '@lottery/core';
-import rawDraws from '../../../../../draws_raw.json';
+import { getMergedDraws } from '@/lib/liveScraper';
 
-function loadDraws() {
-  return (rawDraws as any[]).map((d: any) => ({
-    id: String(d.drawId),
-    drawId: d.drawId,
-    lotteryType: d.lotteryType || 'POWER_655',
-    drawDate: d.drawDate,
-    numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
-    bonusNumber: d.bonusNumber || null,
-  }));
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const draws = loadDraws();
+    const { searchParams } = new URL(request.url);
+    const refresh = searchParams.get('refresh') === 'true';
+
+    const draws = await getMergedDraws(refresh);
     const stats = calculateFrequencyStats(draws, 99);
     return NextResponse.json({ success: true, data: stats });
   } catch (error: any) {
