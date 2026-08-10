@@ -38,6 +38,20 @@ function formatDrawRecord(draw: any): DrawRecord {
 }
 
 // Routes
+server.get('/', async (request, reply) => {
+  return reply.send({
+    name: 'Lottery Analytics Engine API',
+    status: 'online',
+    endpoints: {
+      summary: '/api/summary',
+      draws: '/api/draws',
+      frequencyStats: '/api/stats/frequency',
+      gapStats: '/api/stats/gap',
+      pairsStats: '/api/stats/pairs'
+    }
+  });
+});
+
 server.get('/health', async () => {
   return { status: 'ok', timestamp: new Date() };
 });
