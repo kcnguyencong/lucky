@@ -81,6 +81,20 @@ export function KPICards({ summary }: KPICardsProps) {
   const validation = summary.lastDrawValidation;
   const spSummary = summary.specialPrizeSummary;
 
+  const nextDrawDateStr = (() => {
+    if (!summary.latestDraw?.drawDate) return 'N/A';
+    try {
+      const d = new Date(summary.latestDraw.drawDate);
+      d.setDate(d.getDate() + 1);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return 'N/A';
+    }
+  })();
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8">
       
@@ -109,8 +123,8 @@ export function KPICards({ summary }: KPICardsProps) {
             <span className="text-xs text-slate-400">Đang tính toán...</span>
           )}
         </div>
-        <p className="text-[10px] text-slate-500 mt-2.5 font-medium border-t border-slate-800/80 pt-1.5">
-          2 số chạm đầu/đuôi GĐB tối ưu nhất
+        <p className="text-[10px] text-emerald-400 mt-2.5 font-bold border-t border-emerald-500/20 pt-1.5">
+          Dự báo cho ngày: {nextDrawDateStr}
         </p>
       </div>
 
@@ -139,8 +153,8 @@ export function KPICards({ summary }: KPICardsProps) {
             <span className="text-xs text-slate-400">Đang tính toán...</span>
           )}
         </div>
-        <p className="text-[10px] text-slate-500 mt-2.5 font-medium border-t border-slate-800/80 pt-1.5">
-          2 tổng đề (chữ số hàng chục + đơn vị mod 10)
+        <p className="text-[10px] text-cyan-400 mt-2.5 font-bold border-t border-cyan-500/20 pt-1.5">
+          Dự báo cho ngày: {nextDrawDateStr}
         </p>
       </div>
 
@@ -166,8 +180,8 @@ export function KPICards({ summary }: KPICardsProps) {
             <span className="text-xs text-slate-400">Đang tính toán...</span>
           )}
         </div>
-        <p className="text-xs text-indigo-400/80 mt-2 font-semibold">
-          Kỳ tiếp theo • Lô tô thường
+        <p className="text-xs text-indigo-400 mt-2 font-bold">
+          Dự báo ngày {nextDrawDateStr} • Lô thường
         </p>
       </div>
 
