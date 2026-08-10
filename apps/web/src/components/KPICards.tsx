@@ -171,26 +171,7 @@ export function KPICards({ summary }: KPICardsProps) {
         </p>
       </div>
 
-      {/* CARD 4: Số Lô Hot Nhất */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-            <Flame className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline space-x-3">
-          <span className="text-3xl font-extrabold text-amber-400">
-            {summary.hottestNumber ? String(summary.hottestNumber.number).padStart(2, '0') : '--'}
-          </span>
-          <span className="text-sm text-slate-300 font-bold">
-            {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
-          </span>
-        </div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
-      </div>
-
-      {/* CARD 5: Last Draw Validation */}
+      {/* CARD 4: Hiệu Suất Lô Kỳ Trước */}
       <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-slate-700/60">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-slate-300">Hiệu Suất Lô Kỳ Trước</span>
@@ -231,6 +212,25 @@ export function KPICards({ summary }: KPICardsProps) {
         <p className="text-xs text-slate-500 mt-2 font-medium">
           Đối chiếu kỳ: #{validation?.drawId.replace('MB-', '') || 'N/A'}
         </p>
+      </div>
+
+      {/* CARD 5: Số Lô Hot Nhất */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
+          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+            <Flame className="w-5 h-5" />
+          </div>
+        </div>
+        <div className="flex items-baseline space-x-3">
+          <span className="text-3xl font-extrabold text-amber-400">
+            {summary.hottestNumber ? String(summary.hottestNumber.number).padStart(2, '0') : '--'}
+          </span>
+          <span className="text-sm text-slate-300 font-bold">
+            {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
       </div>
 
     </div>
