@@ -1,58 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DrawRecord } from '@lottery/core';
+import path from 'path';
+import fs from 'fs';
 
-function formatDrawRecord(draw: any): DrawRecord {
-  let numbersArr: number[] = [];
+function loadDraws(): DrawRecord[] {
   try {
-    numbersArr = typeof draw.numbers === 'string' ? JSON.parse(draw.numbers) : draw.numbers;
+    const candidates = [
+      path.join(process.cwd(), 'draws_raw.json'),
+      path.join(process.cwd(), 'apps/web/draws_raw.json'),
+      path.join(__dirname, '../../../../../draws_raw.json'),
+    ];
+    let raw: any[] = [];
+    for (const filePath of candidates) {
+      if (fs.existsSync(filePath)) {
+        raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        break;
+      }
+    }
+    return raw.map((d: any) => ({
+      id: String(d.drawId),
+      drawId: d.drawId,
+      lotteryType: d.lotteryType || 'POWER_655',
+      drawDate: d.drawDate,
+      numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
+      bonusNumber: d.bonusNumber || null,
+    }));
   } catch (e) {
-    numbersArr = [];
+    console.error('Failed to load draws_raw.json:', e);
+    return [];
   }
-  return {
-    id: draw.id,
-    drawId: draw.drawId,
-    lotteryType: draw.lotteryType,
-    drawDate: draw.drawDate,
-    numbers: numbersArr,
-    bonusNumber: draw.bonusNumber,
-  };
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = searchParams.get('page') || '1';
-    const limit = searchParams.get('limit') || '20';
-    const lotteryType = searchParams.get('lotteryType');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const skip = (page - 1) * limit;
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    const where: any = {};
-    if (lotteryType) {
-      where.lotteryType = lotteryType;
-    }
-
-    const rawData = require('../../../../../../draws_raw.json');
-    const total = rawData.length;
-    const items: DrawRecord[] = rawData.slice(skip, skip + limitNum).map((d: any) => ({
-      id: String(d.drawId),
-      drawId: d.drawId,
-      lotteryType: d.lotteryType || 'POWER_655',
-      drawDate: d.drawDate,
-      numbers: d.numbers || [],
-      bonusNumber: d.bonusNumber || null,
-    }));
+    const allDraws = loadDraws();
+    const total = allDraws.length;
+    const items = allDraws.slice(skip, skip + limit);
 
     return NextResponse.json({
       success: true,
       data: items,
       pagination: {
         total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum),
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error: any) {

@@ -1,35 +1,39 @@
 import { NextResponse } from 'next/server';
 import { calculateFrequencyStats, DrawRecord } from '@lottery/core';
+import path from 'path';
+import fs from 'fs';
 
-function formatDrawRecord(draw: any): DrawRecord {
-  let numbersArr: number[] = [];
+function loadDraws(): DrawRecord[] {
   try {
-    numbersArr = typeof draw.numbers === 'string' ? JSON.parse(draw.numbers) : draw.numbers;
-  } catch (e) {
-    numbersArr = [];
-  }
-  return {
-    id: draw.id,
-    drawId: draw.drawId,
-    lotteryType: draw.lotteryType,
-    drawDate: draw.drawDate,
-    numbers: numbersArr,
-    bonusNumber: draw.bonusNumber,
-  };
-}
-
-export async function GET() {
-  try {
-    const rawData = require('../../../Hold/../../../../draws_raw.json'.replace('Hold/../../', ''));
-    const draws: DrawRecord[] = rawData.map((d: any) => ({
+    const candidates = [
+      path.join(process.cwd(), 'draws_raw.json'),
+      path.join(process.cwd(), 'apps/web/draws_raw.json'),
+      path.join(__dirname, '../../../../../draws_raw.json'),
+    ];
+    let raw: any[] = [];
+    for (const filePath of candidates) {
+      if (fs.existsSync(filePath)) {
+        raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        break;
+      }
+    }
+    return raw.map((d: any) => ({
       id: String(d.drawId),
       drawId: d.drawId,
       lotteryType: d.lotteryType || 'POWER_655',
       drawDate: d.drawDate,
-      numbers: d.numbers || [],
+      numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
       bonusNumber: d.bonusNumber || null,
     }));
+  } catch (e) {
+    console.error('Failed to load draws_raw.json:', e);
+    return [];
+  }
+}
 
+export async function GET() {
+  try {
+    const draws = loadDraws();
     const stats = calculateFrequencyStats(draws, 99);
     return NextResponse.json({ success: true, data: stats });
   } catch (error: any) {

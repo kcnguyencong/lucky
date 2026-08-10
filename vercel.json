@@ -1,4 +1,6 @@
 {
-  "buildCommand": "npm run build --workspace=packages/core && npm run build --workspace=packages/database && npm run build --workspace=apps/web",
-  "outputDirectory": "apps/web/.next"
+  "framework": "nextjs",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "npm install"
 }
