@@ -21,27 +21,15 @@ function formatDrawRecord(draw: any): DrawRecord {
 
 export async function GET() {
   try {
-    let draws: DrawRecord[] = [];
-    try {
-      const dbDraws = await prisma.lotteryDraw.findMany({
-        orderBy: { drawDate: 'desc' },
-      });
-      draws = dbDraws.map(formatDrawRecord);
-    } catch (e) {
-      console.warn('Prisma DB error, falling back to raw data:', e);
-    }
-
-    if (draws.length === 0) {
-      const rawData = require('../../../../../../../draws_raw.json');
-      draws = rawData.map((d: any) => ({
-        id: String(d.drawId),
-        drawId: d.drawId,
-        lotteryType: d.lotteryType || 'POWER_655',
-        drawDate: d.drawDate,
-        numbers: d.numbers || [],
-        bonusNumber: d.bonusNumber || null,
-      }));
-    }
+    const rawData = require('../../../Hold/../../../../draws_raw.json'.replace('Hold/../../', ''));
+    const draws: DrawRecord[] = rawData.map((d: any) => ({
+      id: String(d.drawId),
+      drawId: d.drawId,
+      lotteryType: d.lotteryType || 'POWER_655',
+      drawDate: d.drawDate,
+      numbers: d.numbers || [],
+      bonusNumber: d.bonusNumber || null,
+    }));
 
     const stats = calculateFrequencyStats(draws, 99);
     return NextResponse.json({ success: true, data: stats });
