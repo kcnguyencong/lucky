@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Activity, Flame, Snowflake, Award, CheckCircle2, XCircle } from 'lucide-react';
+import { Flame, Award, CheckCircle2, XCircle, Target, Calculator } from 'lucide-react';
 
 interface KPICardsProps {
   summary: {
@@ -10,6 +10,7 @@ interface KPICardsProps {
       drawId: string;
       drawDate: string;
       numbers: number[];
+      bonusNumber?: number | null;
     } | null;
     hottestNumber: {
       number: number;
@@ -43,14 +44,33 @@ interface KPICardsProps {
       }>;
       hitsCount: number;
     } | null;
+    specialPrizeSummary?: {
+      topChamPredictions: Array<{
+        type: 'CHAM_DAU' | 'CHAM_DUOI';
+        value: number;
+        score: number;
+        reasoning: string;
+      }>;
+      topTongPredictions: Array<{
+        type: 'TONG';
+        value: number;
+        score: number;
+        reasoning: string;
+      }>;
+      mostLaggingSpecialNumber: {
+        number: number;
+        currentGap: number;
+        maxGap: number;
+      } | null;
+    } | null;
   } | null;
 }
 
 export function KPICards({ summary }: KPICardsProps) {
   if (!summary) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="h-32 bg-slate-800/50 animate-pulse rounded-xl border border-slate-700/50"></div>
         ))}
       </div>
@@ -59,25 +79,45 @@ export function KPICards({ summary }: KPICardsProps) {
 
   const predictions = summary.topPredictions || [];
   const validation = summary.lastDrawValidation;
+  const spSummary = summary.specialPrizeSummary;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8">
-      {/* Total Draws */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
+      
+      {/* CARD 1: Dự Đoán Chạm Đề GĐB (Replaced Total Draws) */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Tổng Số Kỳ Phân Tích</span>
-          <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
-            <Activity className="w-5 h-5" />
+          <span className="text-sm font-semibold text-emerald-400">Dự Đoán Chạm Đề GĐB</span>
+          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+            <Target className="w-5 h-5" />
           </div>
         </div>
-        <div className="text-3xl font-extrabold text-white tracking-tight">{summary.totalDraws}</div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Kỳ gần nhất: #{summary.latestDraw?.drawId || 'N/A'}</p>
+        
+        <div className="flex flex-col gap-2.5 my-1">
+          {spSummary?.topChamPredictions.map((pred, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md">
+                {pred.type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} {pred.value}
+              </span>
+              <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[130px]" title={pred.reasoning}>
+                {pred.reasoning}
+              </span>
+            </div>
+          ))}
+          {(!spSummary || spSummary.topChamPredictions.length === 0) && (
+            <span className="text-xs text-slate-400">Đang tính toán...</span>
+          )}
+        </div>
+        <p className="text-[10px] text-slate-500 mt-2.5 font-medium border-t border-slate-800/80 pt-1.5">
+          2 số chạm đầu/đuôi GĐB tối ưu nhất
+        </p>
       </div>
 
-      {/* Hottest Number */}
+      {/* CARD 2: Hottest Number */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Số Xuất Hiện Nhiều Nhất</span>
+          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
           <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
             <Flame className="w-5 h-5" />
           </div>
@@ -90,33 +130,44 @@ export function KPICards({ summary }: KPICardsProps) {
             {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
           </span>
         </div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất xuất hiện cao nhất</p>
+        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
       </div>
 
-      {/* Coldest / Most Lagging Number */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
+      {/* CARD 3: Dự Đoán Tổng Đề GĐB (Replaced Coldest/Lagging Lotto) */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/5 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Số Gan Lì (Khan Nhất)</span>
-          <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
-            <Snowflake className="w-5 h-5" />
+          <span className="text-sm font-semibold text-cyan-400">Dự Đoán Tổng Đề GĐB</span>
+          <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20">
+            <Calculator className="w-5 h-5" />
           </div>
         </div>
-        <div className="flex items-baseline space-x-3">
-          <span className="text-3xl font-extrabold text-cyan-400">
-            {summary.mostLaggingNumber ? String(summary.mostLaggingNumber.number).padStart(2, '0') : '--'}
-          </span>
-          <span className="text-sm text-slate-300 font-bold">
-            Vắng {summary.mostLaggingNumber?.currentGap} kỳ
-          </span>
+
+        <div className="flex flex-col gap-2.5 my-1">
+          {spSummary?.topTongPredictions.map((pred, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-cyan-500/15 border border-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-md">
+                Tổng {pred.value}
+              </span>
+              <span className="text-[10px] text-slate-400 font-semibold truncate max-w-[130px]" title={pred.reasoning}>
+                {pred.reasoning}
+              </span>
+            </div>
+          ))}
+          {(!spSummary || spSummary.topTongPredictions.length === 0) && (
+            <span className="text-xs text-slate-500">Đang tính toán...</span>
+          )}
         </div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Kỷ lục khan: {summary.mostLaggingNumber?.maxGap} kỳ chưa về</p>
+        <p className="text-[10px] text-slate-500 mt-2.5 font-medium border-t border-slate-800/80 pt-1.5">
+          2 tổng đề (chữ số hàng chục + đơn vị mod 10)
+        </p>
       </div>
 
-      {/* Top 4 Predicted Numbers for Next Draw */}
+      {/* CARD 4: Top 4 Predicted Numbers for Next Draw */}
       <div className="bg-gradient-to-br from-indigo-950/40 to-purple-950/40 border border-indigo-500/30 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-indigo-500/50">
         <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-indigo-300">Top 4 Dự Đoán Kỳ Tới</span>
+          <span className="text-sm font-semibold text-indigo-300">Top 4 Dự Đoán Lô</span>
           <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-400/30">
             <Award className="w-5 h-5" />
           </div>
@@ -135,14 +186,14 @@ export function KPICards({ summary }: KPICardsProps) {
           )}
         </div>
         <p className="text-xs text-indigo-400/80 mt-2 font-semibold">
-          Kỳ tiếp theo • Chờ kết quả
+          Kỳ tiếp theo • Lô tô thường
         </p>
       </div>
 
-      {/* Last Draw Validation */}
+      {/* CARD 5: Last Draw Validation */}
       <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-slate-700/60">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-slate-300">Kiểm Thử Kỳ Trước</span>
+          <span className="text-sm font-semibold text-slate-300">Hiệu Suất Lô Kỳ Trước</span>
           <div className={`p-2 rounded-lg border text-xs font-bold ${
             validation && validation.hitsCount > 0 
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
@@ -181,6 +232,7 @@ export function KPICards({ summary }: KPICardsProps) {
           Đối chiếu kỳ: #{validation?.drawId.replace('MB-', '') || 'N/A'}
         </p>
       </div>
+
     </div>
   );
 }

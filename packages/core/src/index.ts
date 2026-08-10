@@ -214,6 +214,187 @@ export function predictTopNumbers(
   return scores.sort((a, b) => b.score - a.score).slice(0, topN);
 }
 
+export interface SpecialPrizePrediction {
+  type: 'CHAM_DAU' | 'CHAM_DUOI' | 'TONG';
+  value: number;
+  score: number;
+  reasoning: string;
+}
+
+export interface SpecialPrizeSummary {
+  topChamPredictions: SpecialPrizePrediction[];
+  topTongPredictions: SpecialPrizePrediction[];
+  mostLaggingSpecialNumber: {
+    number: number;
+    currentGap: number;
+    maxGap: number;
+  } | null;
+}
+
+export interface OverviewSummary {
+  totalDraws: number;
+  latestDraw: DrawRecord | null;
+  hottestNumber: FrequencyStat | null;
+  coldestNumber: FrequencyStat | null;
+  mostLaggingNumber: GapStat | null;
+  topPredictions: Array<{
+    number: number;
+    score: number;
+    reasoning: string;
+  }>;
+  specialPrizeSummary: SpecialPrizeSummary;
+}
+
+/**
+ * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies and Tổng Đề omission gaps.
+ */
+export function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSummary {
+  const validDraws = draws
+    .filter((d) => d.bonusNumber !== null && d.bonusNumber !== undefined)
+    .sort((a, b) => new Date(a.drawDate).getTime() - new Date(b.drawDate).getTime());
+
+  if (validDraws.length === 0) {
+    return {
+      topChamPredictions: [],
+      topTongPredictions: [],
+      mostLaggingSpecialNumber: null,
+    };
+  }
+
+  // 1. Calculate gaps for all 100 GĐB numbers (00-99)
+  const specialGaps = Array.from({ length: 100 }, (_, i) => ({
+    number: i,
+    currentGap: 0,
+    maxGap: 0,
+  }));
+
+  validDraws.forEach((draw) => {
+    const num = draw.bonusNumber!;
+    specialGaps.forEach((g) => {
+      if (g.number === num) {
+        if (g.currentGap > g.maxGap) g.maxGap = g.currentGap;
+        g.currentGap = 0;
+      } else {
+        g.currentGap += 1;
+      }
+    });
+  });
+
+  specialGaps.forEach((g) => {
+    if (g.currentGap > g.maxGap) g.maxGap = g.currentGap;
+  });
+
+  const sortedSpecialGaps = [...specialGaps].sort((a, b) => b.currentGap - a.currentGap);
+  const mostLaggingSpecialNumber = sortedSpecialGaps[0] ? {
+    number: sortedSpecialGaps[0].number,
+    currentGap: sortedSpecialGaps[0].currentGap,
+    maxGap: sortedSpecialGaps[0].maxGap,
+  } : null;
+
+  // 2. Calculate Đầu/Đuôi/Tổng frequencies and current gaps
+  const dauStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
+  const duoiStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
+  const tongStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
+
+  const total = validDraws.length;
+
+  validDraws.forEach((draw) => {
+    const num = draw.bonusNumber!;
+    const dau = Math.floor(num / 10);
+    const duoi = num % 10;
+    const tong = (dau + duoi) % 10;
+
+    dauStats.forEach((s) => {
+      if (s.value === dau) {
+        s.appearances++;
+        s.currentGap = 0;
+      } else {
+        s.currentGap++;
+      }
+    });
+
+    duoiStats.forEach((s) => {
+      if (s.value === duoi) {
+        s.appearances++;
+        s.currentGap = 0;
+      } else {
+        s.currentGap++;
+      }
+    });
+
+    tongStats.forEach((s) => {
+      if (s.value === tong) {
+        s.appearances++;
+        s.currentGap = 0;
+      } else {
+        s.currentGap++;
+      }
+    });
+  });
+
+  // Calculate scores for Đầu/Đuôi predictions
+  const getChamPredictions = (type: 'CHAM_DAU' | 'CHAM_DUOI', stats: typeof dauStats): SpecialPrizePrediction[] => {
+    return stats.map((s) => {
+      const freqScore = total > 0 ? (s.appearances / total) * 40 : 0;
+      const expectedGap = 10; // expected average gap for 1 in 10 chance
+      const gapRatio = s.currentGap / expectedGap;
+      const gapScore = Math.min(gapRatio * 60, 60);
+      const totalScore = Number((freqScore + gapScore).toFixed(1));
+
+      let reasoning = type === 'CHAM_DAU' ? `Đầu ${s.value} khan (Vắng ${s.currentGap} kỳ)` : `Đuôi ${s.value} khan (Vắng ${s.currentGap} kỳ)`;
+      if (s.currentGap > 15) {
+        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} cực khan (${s.currentGap} kỳ)`;
+      } else if (s.appearances / total > 0.12) {
+        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} nổ nhiều (${Math.round((s.appearances / total) * 100)}%)`;
+      } else {
+        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} tần suất đều`;
+      }
+
+      return {
+        type,
+        value: s.value,
+        score: totalScore,
+        reasoning,
+      };
+    });
+  };
+
+  const chamDauPredictions = getChamPredictions('CHAM_DAU', dauStats);
+  const chamDuoiPredictions = getChamPredictions('CHAM_DUOI', duoiStats);
+
+  const topChamPredictions = [...chamDauPredictions, ...chamDuoiPredictions]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+
+  const topTongPredictions = tongStats.map((s) => {
+    const freqScore = total > 0 ? (s.appearances / total) * 40 : 0;
+    const expectedGap = 10;
+    const gapRatio = s.currentGap / expectedGap;
+    const gapScore = Math.min(gapRatio * 60, 60);
+    const totalScore = Number((freqScore + gapScore).toFixed(1));
+
+    let reasoning = `Tổng đề ${s.value} khan (Vắng ${s.currentGap} kỳ)`;
+    if (s.currentGap <= 5) {
+      reasoning = `Tổng đề ${s.value} về đều`;
+    }
+
+    return {
+      type: 'TONG' as const,
+      value: s.value,
+      score: totalScore,
+      reasoning,
+    };
+  })
+  .sort((a, b) => b.score - a.score)
+  .slice(0, 2);
+
+  return {
+    topChamPredictions,
+    topTongPredictions,
+    mostLaggingSpecialNumber,
+  };
+}
+
 /**
  * Generates overall summary stats for executive KPIs.
  */
@@ -226,6 +407,11 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
       coldestNumber: null,
       mostLaggingNumber: null,
       topPredictions: [],
+      specialPrizeSummary: {
+        topChamPredictions: [],
+        topTongPredictions: [],
+        mostLaggingSpecialNumber: null,
+      },
     };
   }
 
@@ -244,5 +430,6 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
     coldestNumber: sortedByAppearances[sortedByAppearances.length - 1] || null,
     mostLaggingNumber: sortedByGap[0] || null,
     topPredictions: predictions,
+    specialPrizeSummary: calculateSpecialPrizeStats(draws),
   };
 }

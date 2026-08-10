@@ -59,6 +59,38 @@ export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, ma
     score: number;
     reasoning: string;
 }>;
+export interface SpecialPrizePrediction {
+    type: 'CHAM_DAU' | 'CHAM_DUOI' | 'TONG';
+    value: number;
+    score: number;
+    reasoning: string;
+}
+export interface SpecialPrizeSummary {
+    topChamPredictions: SpecialPrizePrediction[];
+    topTongPredictions: SpecialPrizePrediction[];
+    mostLaggingSpecialNumber: {
+        number: number;
+        currentGap: number;
+        maxGap: number;
+    } | null;
+}
+export interface OverviewSummary {
+    totalDraws: number;
+    latestDraw: DrawRecord | null;
+    hottestNumber: FrequencyStat | null;
+    coldestNumber: FrequencyStat | null;
+    mostLaggingNumber: GapStat | null;
+    topPredictions: Array<{
+        number: number;
+        score: number;
+        reasoning: string;
+    }>;
+    specialPrizeSummary: SpecialPrizeSummary;
+}
+/**
+ * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies and Tổng Đề omission gaps.
+ */
+export declare function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSummary;
 /**
  * Generates overall summary stats for executive KPIs.
  */
