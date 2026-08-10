@@ -84,12 +84,14 @@ export function KPICards({ summary }: KPICardsProps) {
   const nextDrawDateStr = (() => {
     if (!summary.latestDraw?.drawDate) return 'N/A';
     try {
-      const d = new Date(summary.latestDraw.drawDate);
+      const dateStr = String(summary.latestDraw.drawDate).substring(0, 10);
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
       d.setDate(d.getDate() + 1);
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
+      const nextDay = String(d.getDate()).padStart(2, '0');
+      const nextMonth = String(d.getMonth() + 1).padStart(2, '0');
+      const nextYear = d.getFullYear();
+      return `${nextDay}/${nextMonth}/${nextYear}`;
     } catch (e) {
       return 'N/A';
     }
