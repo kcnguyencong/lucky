@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@lottery/database';
 import { calculateFrequencyStats, DrawRecord } from '@lottery/core';
 
 function formatDrawRecord(draw: any): DrawRecord {

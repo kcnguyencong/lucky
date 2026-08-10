@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@lottery/database';
 import { generateOverviewSummary, DrawRecord } from '@lottery/core';
 
 function formatDrawRecord(draw: any): DrawRecord {
