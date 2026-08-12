@@ -211,6 +211,94 @@ export function predictTopNumbers(
     };
   });
 
+  if (topN === 4 && scores.length >= 4) {
+    const candidateList = [...scores].sort((a, b) => b.score - a.score).slice(0, 30);
+    
+    // Precompute draw appearances for candidate numbers
+    const drawAppearances = new Map<number, Set<number>>();
+    candidateList.forEach(cand => {
+      const set = new Set<number>();
+      draws.forEach((draw, index) => {
+        if (draw.numbers.includes(cand.number)) {
+          set.add(index);
+        }
+      });
+      drawAppearances.set(cand.number, set);
+    });
+
+    const getCorrelation = (numA: number, numB: number): number => {
+      const drawsA = drawAppearances.get(numA)!;
+      const drawsB = drawAppearances.get(numB)!;
+      const n = draws.length;
+      if (n === 0) return 0;
+      
+      const n1 = drawsA.size;
+      const n2 = drawsB.size;
+      let n12 = 0;
+      for (const idx of drawsA) {
+        if (drawsB.has(idx)) {
+          n12++;
+        }
+      }
+      
+      if (n1 === 0 || n2 === 0 || n1 === n || n2 === n) return 0;
+      
+      const numerator = n12 * n - n1 * n2;
+      const denominator = Math.sqrt(n1 * (n - n1) * n2 * (n - n2));
+      return denominator === 0 ? 0 : numerator / denominator;
+    };
+
+    interface Combo {
+      items: typeof candidateList;
+      totalScore: number;
+    }
+    const combos: Combo[] = [];
+    const nCandidates = candidateList.length;
+
+    for (let i = 0; i < nCandidates; i++) {
+      for (let j = i + 1; j < nCandidates; j++) {
+        for (let k = j + 1; k < nCandidates; k++) {
+          for (let m = k + 1; m < nCandidates; m++) {
+            const items = [candidateList[i], candidateList[j], candidateList[k], candidateList[m]];
+            const totalScore = items.reduce((sum, item) => sum + item.score, 0);
+            combos.push({ items, totalScore });
+          }
+        }
+      }
+    }
+
+    combos.sort((a, b) => b.totalScore - a.totalScore);
+
+    const maxCorrelation = 0.15;
+    for (const combo of combos) {
+      const items = combo.items;
+      const nums = items.map(item => item.number);
+      
+      // 1. Spatial Distribution Filter: ensure 4 numbers span at least 3 different tens digit zones
+      const zones = new Set(nums.map(num => Math.floor(num / 10)));
+      if (zones.size < 3) {
+        continue;
+      }
+
+      // 2. Co-occurrence Correlation Check
+      let hasHighCorrelation = false;
+      for (let p1 = 0; p1 < nums.length; p1++) {
+        for (let p2 = p1 + 1; p2 < nums.length; p2++) {
+          const corr = getCorrelation(nums[p1], nums[p2]);
+          if (corr >= maxCorrelation) {
+            hasHighCorrelation = true;
+            break;
+          }
+        }
+        if (hasHighCorrelation) break;
+      }
+
+      if (!hasHighCorrelation) {
+        return items;
+      }
+    }
+  }
+
   return scores.sort((a, b) => b.score - a.score).slice(0, topN);
 }
 
