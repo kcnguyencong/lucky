@@ -1,3 +1,4 @@
+// Trigger build for core package update: Spatial Distribution & Co-occurrence Filters
 import { NextRequest, NextResponse } from 'next/server';
 import { generateOverviewSummary, predictTopNumbers } from '@lottery/core';
 import { getMergedDraws } from '@/lib/liveScraper';
