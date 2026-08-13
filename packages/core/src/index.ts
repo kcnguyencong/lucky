@@ -185,21 +185,38 @@ export function predictTopNumbers(
     };
     const recentHits = recentCounts.get(freq.number) || 0;
 
-    // Normalize metrics
-    const freqScore = totalDraws > 0 ? (freq.appearances / totalDraws) * 40 : 0; // max ~40 pts
-    const momentumScore = (recentHits / 10) * 35; // max ~35 pts
+    // --- Rebalanced scoring weights (v2) ---
+    // Historical frequency: 40 pts max
+    const freqScore = totalDraws > 0 ? (freq.appearances / totalDraws) * 40 : 0;
 
-    // Gap ratio: numbers near or above their avg gap get higher score
+    // Momentum (reduced): 15 pts max — less bias towards "hot streak" numbers
+    const momentumScore = (recentHits / 10) * 15;
+
+    // Gap elasticity (increased): 45 pts max — reward numbers due for return
+    // Use a bell-curve-like boost: peaks at gapRatio ~1.0–1.5, tapers after 2.5
     const gapRatio = gap.avgGap > 0 ? gap.currentGap / gap.avgGap : 0;
-    const gapScore = Math.min(gapRatio * 25, 25); // max ~25 pts
+    let gapScore: number;
+    if (gapRatio <= 0.5) {
+      // Too recent — low priority
+      gapScore = gapRatio * 10;
+    } else if (gapRatio <= 1.5) {
+      // Near or at average gap — prime zone
+      gapScore = 20 + (gapRatio - 0.5) * 25; // 20–45 pts
+    } else {
+      // Overdue: plateau then gently taper to avoid over-ranking perpetually absent numbers
+      gapScore = Math.max(45 - (gapRatio - 1.5) * 8, 30);
+    }
+    gapScore = Math.min(gapScore, 45);
 
     const totalScore = Number((freqScore + momentumScore + gapScore).toFixed(1));
 
     let reasoning = 'Cân bằng tần suất';
-    if (recentHits >= 3) {
+    if (gapRatio >= 1.5) {
+      reasoning = `Khan đến điểm nổ (Vắng ${gap.currentGap} kỳ, TB ${gap.avgGap.toFixed(1)} kỳ)`;
+    } else if (gapRatio >= 0.8 && gapRatio < 1.5) {
+      reasoning = `Đến kỳ trở lại (Vắng ${gap.currentGap} kỳ)`;
+    } else if (recentHits >= 3) {
       reasoning = `Đang vào dây hot (${recentHits} lần/10 kỳ)`;
-    } else if (gapRatio >= 1.2) {
-      reasoning = `Khan đến điểm nổ (Vắng ${gap.currentGap} kỳ)`;
     } else if (freq.percentage >= 3) {
       reasoning = `Tần suất cao (${freq.percentage}%)`;
     }
@@ -212,7 +229,7 @@ export function predictTopNumbers(
   });
 
   if (topN === 4 && scores.length >= 4) {
-    const candidateList = [...scores].sort((a, b) => b.score - a.score).slice(0, 30);
+    const candidateList = [...scores].sort((a, b) => b.score - a.score).slice(0, 50);
     
     // Precompute draw appearances for candidate numbers
     const drawAppearances = new Map<number, Set<number>>();
@@ -269,7 +286,7 @@ export function predictTopNumbers(
 
     combos.sort((a, b) => b.totalScore - a.totalScore);
 
-    const maxCorrelation = 0.15;
+    const maxCorrelation = 0.10;
     for (const combo of combos) {
       const items = combo.items;
       const nums = items.map(item => item.number);
