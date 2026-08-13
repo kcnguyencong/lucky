@@ -1,4 +1,4 @@
-// Trigger build for core package update: Spatial Distribution & Co-occurrence Filters
+// Trigger build for core package v2: rebalanced scoring weights (gap elasticity 45pts, momentum 15pts)
 import { NextRequest, NextResponse } from 'next/server';
 import { generateOverviewSummary, predictTopNumbers } from '@lottery/core';
 import { getMergedDraws } from '@/lib/liveScraper';
