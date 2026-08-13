@@ -49,15 +49,12 @@ export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: numbe
  */
 export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.1.
  *
- * Design rationale (backed by backtest on 30 historical draws):
- * - Previous algorithm v2 scored 17.5% hit rate (worse than 23.5% random baseline).
- * - Root cause: Spatial-zone filter and Co-occurrence filter over-constrained selection,
- *   removing high-frequency numbers that co-appear legitimately.
- * - Algorithm v3 uses Exponentially-weighted Frequency as the dominant signal (empirically
- *   best: 29.3% hit rate). Mild gap bonuses are applied only for gap values that showed
- *   elevated empirical hit rates (gap=3 → 27.1%, gap=5–7 → 33.3% in historical data).
+ * Design rationale:
+ * - Exponentially-weighted Frequency is the primary signal (max 70 pts).
+ * - Empirical Gap Bonus (max 15 pts) rewards stats-proven omission windows:
+ *   gap=3 → +10 pts | gap=5–7 → +15 pts | gap=2,4 → +5 pts.
  */
 export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
     number: number;

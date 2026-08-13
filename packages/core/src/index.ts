@@ -112,7 +112,8 @@ export function calculateGapStats(draws: DrawRecord[], maxNumber: number = 99): 
       maxGap = currentGap;
     }
 
-    const avgGap = gaps.length > 0 ? Number((gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(1)) : currentGap;
+    const allGaps = appearances > 0 ? [...gaps, currentGap] : [currentGap];
+    const avgGap = Number((allGaps.reduce((a, b) => a + b, 0) / allGaps.length).toFixed(1));
 
     gapStats.push({
       number: num,
@@ -152,15 +153,12 @@ export function calculateTopPairs(draws: DrawRecord[], topN: number = 10): PairS
 }
 
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.1.
  *
- * Design rationale (backed by backtest on 30 historical draws):
- * - Previous algorithm v2 scored 17.5% hit rate (worse than 23.5% random baseline).
- * - Root cause: Spatial-zone filter and Co-occurrence filter over-constrained selection,
- *   removing high-frequency numbers that co-appear legitimately.
- * - Algorithm v3 uses Exponentially-weighted Frequency as the dominant signal (empirically
- *   best: 29.3% hit rate). Mild gap bonuses are applied only for gap values that showed
- *   elevated empirical hit rates (gap=3 → 27.1%, gap=5–7 → 33.3% in historical data).
+ * Design rationale:
+ * - Exponentially-weighted Frequency is the primary signal (max 70 pts).
+ * - Empirical Gap Bonus (max 15 pts) rewards stats-proven omission windows:
+ *   gap=3 → +10 pts | gap=5–7 → +15 pts | gap=2,4 → +5 pts.
  */
 export function predictTopNumbers(
   draws: DrawRecord[],
@@ -175,8 +173,7 @@ export function predictTopNumbers(
   );
 
   // --- Component 1: Exponentially-Decayed Frequency (max 70 pts) ---
-  // Recent appearances count more; older ones decay exponentially.
-  const DECAY = 0.92; // e^(-0.08 per draw step) ≈ 92% retention per draw
+  const DECAY = 0.92; // ~92% retention per draw
   const weightedFreq = new Map<number, number>();
   for (let i = 0; i <= maxNumber; i++) weightedFreq.set(i, 0);
 
@@ -193,8 +190,6 @@ export function predictTopNumbers(
   const maxWeighted = Math.max(...Array.from(weightedFreq.values()));
 
   // --- Component 2: Empirical Gap Bonus (max 15 pts) ---
-  // Only reward gap values that showed >25% hit rate in backtest:
-  //   gap=3  → 27.1% | gap=5–7 → 21–33% | gap=2–4 → mild bonus
   const currentGap = new Map<number, number>();
   for (let i = 0; i <= maxNumber; i++) {
     let gap = 0;
@@ -218,11 +213,11 @@ export function predictTopNumbers(
     // Empirical gap bonus
     let gapBonus = 0;
     if (gap === 3) {
-      gapBonus = 10; // empirically best single-value zone
+      gapBonus = 10;
     } else if (gap >= 5 && gap <= 7) {
-      gapBonus = 15; // highest observed hit rate zone (up to 33%)
-    } else if (gap >= 2 && gap <= 4) {
-      gapBonus = 5; // mild broad bonus
+      gapBonus = 15;
+    } else if (gap === 2 || gap === 4) {
+      gapBonus = 5;
     }
 
     const totalScore = Number((freqScore + gapBonus).toFixed(1));
@@ -234,6 +229,8 @@ export function predictTopNumbers(
       reasoning = `Vắng ${gap} kỳ — vùng nổ cao nhất (tần suất ${pct}%)`;
     } else if (gap === 3) {
       reasoning = `Vắng ${gap} kỳ — vùng điểm ngọt (tần suất ${pct}%)`;
+    } else if (gap === 2 || gap === 4) {
+      reasoning = `Vắng ${gap} kỳ — nhịp điều hòa (tần suất ${pct}%)`;
     } else if (gap === 0) {
       reasoning = `Vừa nổ — đang dây hot (tần suất ${pct}%)`;
     } else if (gap === 1) {
@@ -364,22 +361,36 @@ export function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSum
     });
   });
 
-  // Calculate scores for Đầu/Đuôi predictions
+  // Balanced scoring model for Special Prize (Đề/Chạm/Tổng):
+  // Frequency: Max 60 pts based on occurrence rate
+  // Gap Zone Bonus: Max 40 pts based on realistic cycle (8-15 draws sweet spot)
   const getChamPredictions = (type: 'CHAM_DAU' | 'CHAM_DUOI', stats: typeof dauStats): SpecialPrizePrediction[] => {
+    const maxFreq = Math.max(...stats.map(s => s.appearances));
     return stats.map((s) => {
-      const freqScore = total > 0 ? (s.appearances / total) * 40 : 0;
-      const expectedGap = 10; // expected average gap for 1 in 10 chance
-      const gapRatio = s.currentGap / expectedGap;
-      const gapScore = Math.min(gapRatio * 60, 60);
-      const totalScore = Number((freqScore + gapScore).toFixed(1));
-
-      let reasoning = type === 'CHAM_DAU' ? `Đầu ${s.value} khan (Vắng ${s.currentGap} kỳ)` : `Đuôi ${s.value} khan (Vắng ${s.currentGap} kỳ)`;
-      if (s.currentGap > 15) {
-        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} cực khan (${s.currentGap} kỳ)`;
-      } else if (s.appearances / total > 0.12) {
-        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} nổ nhiều (${Math.round((s.appearances / total) * 100)}%)`;
+      const freqScore = maxFreq > 0 ? (s.appearances / maxFreq) * 60 : 0;
+      
+      let gapBonus = 0;
+      if (s.currentGap >= 8 && s.currentGap <= 15) {
+        gapBonus = 40; // Sweet spot for Chạm break out
+      } else if (s.currentGap >= 4 && s.currentGap <= 7) {
+        gapBonus = 25; // Normal expected interval
+      } else if (s.currentGap <= 3) {
+        gapBonus = 20; // Hot streak retention
       } else {
-        reasoning = `${type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi'} ${s.value} tần suất đều`;
+        gapBonus = 25; // Extreme khan (>15 draws) has risk penalty
+      }
+
+      const totalScore = Number((freqScore + gapBonus).toFixed(1));
+      const prefix = type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi';
+      const pct = Math.round((s.appearances / total) * 100);
+
+      let reasoning = `${prefix} ${s.value} tần suất ${pct}%`;
+      if (s.currentGap > 15) {
+        reasoning = `${prefix} ${s.value} cực khan (Vắng ${s.currentGap} kỳ)`;
+      } else if (s.currentGap >= 8 && s.currentGap <= 15) {
+        reasoning = `${prefix} ${s.value} rơi vào vùng bùng nổ (Vắng ${s.currentGap} kỳ)`;
+      } else if (s.currentGap <= 3 && pct >= 12) {
+        reasoning = `${prefix} ${s.value} đang dây hot (nổ ${pct}%)`;
       }
 
       return {
@@ -398,16 +409,31 @@ export function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSum
     .sort((a, b) => b.score - a.score)
     .slice(0, 2);
 
+  const maxTongFreq = Math.max(...tongStats.map(s => s.appearances));
   const topTongPredictions = tongStats.map((s) => {
-    const freqScore = total > 0 ? (s.appearances / total) * 40 : 0;
-    const expectedGap = 10;
-    const gapRatio = s.currentGap / expectedGap;
-    const gapScore = Math.min(gapRatio * 60, 60);
-    const totalScore = Number((freqScore + gapScore).toFixed(1));
+    const freqScore = maxTongFreq > 0 ? (s.appearances / maxTongFreq) * 60 : 0;
+    
+    let gapBonus = 0;
+    if (s.currentGap >= 8 && s.currentGap <= 15) {
+      gapBonus = 40;
+    } else if (s.currentGap >= 4 && s.currentGap <= 7) {
+      gapBonus = 25;
+    } else if (s.currentGap <= 3) {
+      gapBonus = 20;
+    } else {
+      gapBonus = 25;
+    }
 
-    let reasoning = `Tổng đề ${s.value} khan (Vắng ${s.currentGap} kỳ)`;
-    if (s.currentGap <= 5) {
-      reasoning = `Tổng đề ${s.value} về đều`;
+    const totalScore = Number((freqScore + gapBonus).toFixed(1));
+    const pct = Math.round((s.appearances / total) * 100);
+
+    let reasoning = `Tổng đề ${s.value} tần suất ${pct}%`;
+    if (s.currentGap > 15) {
+      reasoning = `Tổng đề ${s.value} cực khan (Vắng ${s.currentGap} kỳ)`;
+    } else if (s.currentGap >= 8 && s.currentGap <= 15) {
+      reasoning = `Tổng đề ${s.value} rơi vào vùng nổ (Vắng ${s.currentGap} kỳ)`;
+    } else if (s.currentGap <= 3) {
+      reasoning = `Tổng đề ${s.value} về đều (Vắng ${s.currentGap} kỳ)`;
     }
 
     return {
