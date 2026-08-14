@@ -160,22 +160,22 @@ export function KPICards({ summary }: KPICardsProps) {
         </p>
       </div>
 
-      {/* CARD 3: Top 4 Dự Đoán Lô */}
+      {/* CARD 3: Top 2 Dự Đoán Lô (Song Thủ Lô) */}
       <div className="bg-gradient-to-br from-indigo-950/40 to-purple-950/40 border border-indigo-500/30 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-indigo-500/50">
         <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-indigo-300">Top 4 Dự Đoán Lô</span>
+          <span className="text-sm font-semibold text-indigo-300">Top 2 Dự Đoán Lô</span>
           <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-400/30">
             <Award className="w-5 h-5" />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 my-2">
+        <div className="flex items-center justify-around gap-2 my-2">
           {predictions.map((item, idx) => (
             <div key={idx} className="flex flex-col items-center">
-              <span className="inline-flex items-center justify-center w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-300/30 text-white text-sm font-extrabold rounded-xl shadow-md shadow-indigo-950/50">
+              <span className="inline-flex items-center justify-center w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-300/30 text-white text-base font-extrabold rounded-xl shadow-md shadow-indigo-950/50">
                 {String(item.number).padStart(2, '0')}
               </span>
-              <span className="text-[10px] text-indigo-300 font-semibold mt-1">{item.score}đ</span>
+              <span className="text-xs text-indigo-300 font-semibold mt-1">{item.score}đ</span>
             </div>
           ))}
           {predictions.length === 0 && (
@@ -183,7 +183,7 @@ export function KPICards({ summary }: KPICardsProps) {
           )}
         </div>
         <p className="text-xs text-indigo-400 mt-2 font-bold">
-          Dự báo ngày {nextDrawDateStr} • Lô thường
+          Dự báo ngày {nextDrawDateStr} • Song thủ lô
         </p>
       </div>
 
@@ -196,7 +196,7 @@ export function KPICards({ summary }: KPICardsProps) {
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
               : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
           }`}>
-            {validation ? `Trúng ${validation.hitsCount}/4` : 'N/A'}
+            {validation ? `Trúng ${validation.hitsCount}/2` : 'N/A'}
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 my-2">

@@ -162,7 +162,7 @@ export function calculateTopPairs(draws: DrawRecord[], topN: number = 10): PairS
  */
 export function predictTopNumbers(
   draws: DrawRecord[],
-  topN: number = 4,
+  topN: number = 2,
   maxNumber: number = 99
 ): Array<{ number: number; score: number; reasoning: string }> {
   if (draws.length === 0) return [];
@@ -476,7 +476,7 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
   const sortedDraws = [...draws].sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
   const freqStats = calculateFrequencyStats(draws);
   const gapStats = calculateGapStats(draws);
-  const predictions = predictTopNumbers(draws, 4);
+  const predictions = predictTopNumbers(draws, 2);
 
   const sortedByAppearances = [...freqStats].sort((a, b) => b.appearances - a.appearances);
   const sortedByGap = [...gapStats].sort((a, b) => b.currentGap - a.currentGap);

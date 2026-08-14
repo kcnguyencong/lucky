@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       const pastHistory = draws.slice(1);
       
       // Predict what the numbers would be for the latestDraw, using only pastHistory
-      const pastPredictions = predictTopNumbers(pastHistory, 4);
+      const pastPredictions = predictTopNumbers(pastHistory, 2);
       
       const validatedPredictions = pastPredictions.map((pred) => {
         const isHit = latestDraw.numbers.includes(pred.number);

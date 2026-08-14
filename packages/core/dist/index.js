@@ -112,7 +112,7 @@ function calculateTopPairs(draws, topN = 10) {
  * - Empirical Gap Bonus (max 15 pts) rewards stats-proven omission windows:
  *   gap=3 → +10 pts | gap=5–7 → +15 pts | gap=2,4 → +5 pts.
  */
-function predictTopNumbers(draws, topN = 4, maxNumber = 99) {
+function predictTopNumbers(draws, topN = 2, maxNumber = 99) {
     if (draws.length === 0)
         return [];
     // Sort draws newest-first for decay calculation
@@ -377,7 +377,7 @@ function generateOverviewSummary(draws) {
     const sortedDraws = [...draws].sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
     const freqStats = calculateFrequencyStats(draws);
     const gapStats = calculateGapStats(draws);
-    const predictions = predictTopNumbers(draws, 4);
+    const predictions = predictTopNumbers(draws, 2);
     const sortedByAppearances = [...freqStats].sort((a, b) => b.appearances - a.appearances);
     const sortedByGap = [...gapStats].sort((a, b) => b.currentGap - a.currentGap);
     return {
