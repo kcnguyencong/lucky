@@ -1,7 +1,10 @@
-// Trigger build for core package v2: rebalanced scoring weights (gap elasticity 45pts, momentum 15pts)
+// Trigger build for core package v5 algorithm update
 import { NextRequest, NextResponse } from 'next/server';
 import { generateOverviewSummary, predictTopNumbers } from '@lottery/core';
 import { getMergedDraws } from '@/lib/liveScraper';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
