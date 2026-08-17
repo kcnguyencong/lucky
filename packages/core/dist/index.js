@@ -105,81 +105,139 @@ function calculateTopPairs(draws, topN = 10) {
         .slice(0, topN);
 }
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.1.
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v5 (Multi-Factor Model).
  *
- * Design rationale:
- * - Exponentially-weighted Frequency is the primary signal (max 70 pts).
- * - Empirical Gap Bonus (max 15 pts) rewards stats-proven omission windows:
- *   gap=3 → +10 pts | gap=5–7 → +15 pts | gap=2,4 → +5 pts.
+ * Design Rationale:
+ * - Does NOT rely on raw cumulative overall historical hits (which biases toward stale top-hit numbers).
+ * - Multi-Factor Scoring Architecture:
+ *   1. Short-Term Momentum (Window 12 draws with decay, max 45 pts).
+ *   2. Personal Cycle Alignment (Gap-to-AvgElasticity, max 30 pts): Rewards numbers hitting their personal historical mean gap sweet spot.
+ *   3. Pair Coupling / Bạc Nhớ (Co-occurrence with previous draw numbers, max 25 pts).
+ *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws to prevent over-saturated picks.
  */
 function predictTopNumbers(draws, topN = 2, maxNumber = 99) {
     if (draws.length === 0)
         return [];
-    // Sort draws newest-first for decay calculation
+    // Sort draws newest-first
     const sortedDesc = [...draws].sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
-    // --- Component 1: Exponentially-Decayed Frequency (max 70 pts) ---
-    const DECAY = 0.92; // ~92% retention per draw
-    const weightedFreq = new Map();
+    const latestDrawNums = new Set(sortedDesc[0].numbers);
+    // 1. Short-Term Momentum (Window of 12 draws with 0.90 decay, max 45 pts)
+    const shortWindow = Math.min(12, sortedDesc.length);
+    const recentFreq = new Map();
     for (let i = 0; i <= maxNumber; i++)
-        weightedFreq.set(i, 0);
-    sortedDesc.forEach((draw, i) => {
-        const weight = Math.pow(DECAY, i);
-        const uniqueNums = new Set(draw.numbers);
+        recentFreq.set(i, 0);
+    for (let i = 0; i < shortWindow; i++) {
+        const weight = Math.pow(0.9, i);
+        const uniqueNums = new Set(sortedDesc[i].numbers);
         uniqueNums.forEach((num) => {
             if (num <= maxNumber) {
-                weightedFreq.set(num, (weightedFreq.get(num) || 0) + weight);
+                recentFreq.set(num, (recentFreq.get(num) || 0) + weight);
             }
         });
-    });
-    const maxWeighted = Math.max(...Array.from(weightedFreq.values()));
-    // --- Component 2: Empirical Gap Bonus (max 15 pts) ---
-    const currentGap = new Map();
-    for (let i = 0; i <= maxNumber; i++) {
-        let gap = 0;
-        for (const draw of sortedDesc) {
-            if (draw.numbers.includes(i))
-                break;
-            gap++;
-        }
-        currentGap.set(i, gap);
     }
-    // Build final scores
-    const totalDraws = draws.length;
+    const maxRecent = Math.max(...Array.from(recentFreq.values())) || 1;
+    // 2. Personal Cycle Alignment (Gap-to-Average Elasticity, max 30 pts)
+    const currentGapMap = new Map();
+    const avgGapMap = new Map();
+    const cycleMatchScores = new Map();
+    for (let num = 0; num <= maxNumber; num++) {
+        let curGap = 0;
+        for (const draw of sortedDesc) {
+            if (draw.numbers.includes(num))
+                break;
+            curGap++;
+        }
+        currentGapMap.set(num, curGap);
+        const gaps = [];
+        let g = 0;
+        const asc = [...sortedDesc].reverse();
+        asc.forEach((d) => {
+            if (d.numbers.includes(num)) {
+                gaps.push(g);
+                g = 0;
+            }
+            else {
+                g++;
+            }
+        });
+        const avgG = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 8;
+        avgGapMap.set(num, Number(avgG.toFixed(1)));
+        let cycleScore = 0;
+        if (avgG >= 2) {
+            const ratio = curGap / avgG;
+            if (ratio >= 0.8 && ratio <= 1.25) {
+                cycleScore = 30; // Sweet spot explosion timing
+            }
+            else if (ratio >= 0.5 && ratio < 0.8) {
+                cycleScore = 15; // Entering sweet spot window
+            }
+            else if (curGap === 1 || curGap === 2) {
+                cycleScore = 12; // Regular 1-2 draw rhythm
+            }
+        }
+        else {
+            if (curGap === 1 || curGap === 2)
+                cycleScore = 15;
+        }
+        cycleMatchScores.set(num, cycleScore);
+    }
+    // 3. Pair Coupling / Bạc Nhớ Co-occurrence (max 25 pts)
+    const pairCoCounts = new Map();
+    sortedDesc.slice(0, 30).forEach((draw) => {
+        const nums = Array.from(new Set(draw.numbers));
+        for (let i = 0; i < nums.length; i++) {
+            for (let j = i + 1; j < nums.length; j++) {
+                const k1 = `${nums[i]}-${nums[j]}`;
+                const k2 = `${nums[j]}-${nums[i]}`;
+                pairCoCounts.set(k1, (pairCoCounts.get(k1) || 0) + 1);
+                pairCoCounts.set(k2, (pairCoCounts.get(k2) || 0) + 1);
+            }
+        }
+    });
+    const pairCouplingScores = new Map();
+    for (let num = 0; num <= maxNumber; num++) {
+        let couplingSum = 0;
+        latestDrawNums.forEach((prevNum) => {
+            if (prevNum !== num) {
+                couplingSum += pairCoCounts.get(`${prevNum}-${num}`) || 0;
+            }
+        });
+        pairCouplingScores.set(num, couplingSum);
+    }
+    const maxPairCoupling = Math.max(...Array.from(pairCouplingScores.values())) || 1;
+    // 4. Saturation Penalty (-15 pts for 3+ consecutive hits)
+    const saturationPenalty = new Map();
+    for (let num = 0; num <= maxNumber; num++) {
+        let streak = 0;
+        for (let i = 0; i < Math.min(4, sortedDesc.length); i++) {
+            if (sortedDesc[i].numbers.includes(num))
+                streak++;
+            else
+                break;
+        }
+        saturationPenalty.set(num, streak >= 3 ? -15 : 0);
+    }
+    // Combine Scores
     const scores = Array.from({ length: maxNumber + 1 }, (_, num) => {
-        const wf = weightedFreq.get(num) || 0;
-        const rawAppearances = sortedDesc.filter((d) => d.numbers.includes(num)).length;
-        const gap = currentGap.get(num) || 0;
-        // Frequency score (dominant signal)
-        const freqScore = maxWeighted > 0 ? (wf / maxWeighted) * 70 : 0;
-        // Empirical gap bonus
-        let gapBonus = 0;
-        if (gap === 3) {
-            gapBonus = 10;
+        const mScore = (recentFreq.get(num) / maxRecent) * 45;
+        const cScore = cycleMatchScores.get(num) || 0;
+        const pScore = (pairCouplingScores.get(num) / maxPairCoupling) * 25;
+        const sPenalty = saturationPenalty.get(num) || 0;
+        const totalScore = Number((mScore + cScore + pScore + sPenalty).toFixed(1));
+        const curG = currentGapMap.get(num);
+        const avgG = avgGapMap.get(num);
+        let reasoning = `Phong độ gần đây tốt`;
+        if (cScore === 30) {
+            reasoning = `Rơi đúng điểm nổ chu kỳ cá nhân (Vắng ${curG} kỳ ~ TB ${avgG} kỳ)`;
         }
-        else if (gap >= 5 && gap <= 7) {
-            gapBonus = 15;
+        else if (pScore >= 18) {
+            reasoning = `Bạc nhớ cặp số ăn theo từ kết quả kỳ trước`;
         }
-        else if (gap === 2 || gap === 4) {
-            gapBonus = 5;
+        else if (curG === 1 || curG === 2) {
+            reasoning = `Nhịp nổ 1-2 kỳ đều đặn`;
         }
-        const totalScore = Number((freqScore + gapBonus).toFixed(1));
-        // Human-readable reasoning
-        const pct = totalDraws > 0 ? ((rawAppearances / totalDraws) * 100).toFixed(1) : '0';
-        let reasoning = `Tần suất ${pct}%`;
-        if (gap >= 5 && gap <= 7) {
-            reasoning = `Vắng ${gap} kỳ — vùng nổ cao nhất (tần suất ${pct}%)`;
-        }
-        else if (gap === 3) {
-            reasoning = `Vắng ${gap} kỳ — vùng điểm ngọt (tần suất ${pct}%)`;
-        }
-        else if (gap === 2 || gap === 4) {
-            reasoning = `Vắng ${gap} kỳ — nhịp điều hòa (tần suất ${pct}%)`;
-        }
-        else if (gap === 0) {
-            reasoning = `Vừa nổ — đang dây hot (tần suất ${pct}%)`;
-        }
-        else if (gap === 1) {
-            reasoning = `Nghỉ 1 kỳ — tần suất cao (${pct}%)`;
+        else if (sPenalty < 0) {
+            reasoning = `Phong độ duy trì (Tránh rủi ro cạn nhịp)`;
         }
         return { number: num, score: totalScore, reasoning };
     });

@@ -49,12 +49,15 @@ export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: numbe
  */
 export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v3.1.
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v5 (Multi-Factor Model).
  *
- * Design rationale:
- * - Exponentially-weighted Frequency is the primary signal (max 70 pts).
- * - Empirical Gap Bonus (max 15 pts) rewards stats-proven omission windows:
- *   gap=3 → +10 pts | gap=5–7 → +15 pts | gap=2,4 → +5 pts.
+ * Design Rationale:
+ * - Does NOT rely on raw cumulative overall historical hits (which biases toward stale top-hit numbers).
+ * - Multi-Factor Scoring Architecture:
+ *   1. Short-Term Momentum (Window 12 draws with decay, max 45 pts).
+ *   2. Personal Cycle Alignment (Gap-to-AvgElasticity, max 30 pts): Rewards numbers hitting their personal historical mean gap sweet spot.
+ *   3. Pair Coupling / Bạc Nhớ (Co-occurrence with previous draw numbers, max 25 pts).
+ *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws to prevent over-saturated picks.
  */
 export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
     number: number;
