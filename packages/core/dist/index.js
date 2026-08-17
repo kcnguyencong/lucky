@@ -244,7 +244,8 @@ function predictTopNumbers(draws, topN = 2, maxNumber = 99) {
     return scores.sort((a, b) => b.score - a.score).slice(0, topN);
 }
 /**
- * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies and Tổng Đề omission gaps.
+ * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies, Tổng Đề omission gaps,
+ * and Next-Day GĐB Bạc Nhớ Correlation (mketqua.net statistics).
  */
 function calculateSpecialPrizeStats(draws) {
     const validDraws = draws
@@ -255,6 +256,7 @@ function calculateSpecialPrizeStats(draws) {
             topChamPredictions: [],
             topTongPredictions: [],
             mostLaggingSpecialNumber: null,
+            nextDayGdbStats: null,
         };
     }
     // 1. Calculate gaps for all 100 GĐB numbers (00-99)
@@ -286,7 +288,48 @@ function calculateSpecialPrizeStats(draws) {
         currentGap: sortedSpecialGaps[0].currentGap,
         maxGap: sortedSpecialGaps[0].maxGap,
     } : null;
-    // 2. Calculate Đầu/Đuôi/Tổng frequencies and current gaps
+    // 2. Next-Day GĐB Bạc Nhớ Correlation Analysis (mketqua.net statistics)
+    const latestBonus = validDraws[validDraws.length - 1].bonusNumber;
+    const followUpDauMap = new Map();
+    const followUpDuoiMap = new Map();
+    const followUpTongMap = new Map();
+    const followUpNumMap = new Map();
+    let occurrenceCount = 0;
+    for (let i = 0; i < validDraws.length - 1; i++) {
+        if (validDraws[i].bonusNumber === latestBonus) {
+            occurrenceCount++;
+            const nxt = validDraws[i + 1].bonusNumber;
+            const dau = Math.floor(nxt / 10);
+            const duoi = nxt % 10;
+            const tong = (dau + duoi) % 10;
+            followUpDauMap.set(dau, (followUpDauMap.get(dau) || 0) + 1);
+            followUpDuoiMap.set(duoi, (followUpDuoiMap.get(duoi) || 0) + 1);
+            followUpTongMap.set(tong, (followUpTongMap.get(tong) || 0) + 1);
+            followUpNumMap.set(nxt, (followUpNumMap.get(nxt) || 0) + 1);
+        }
+    }
+    const topFollowUpDau = Array.from(followUpDauMap.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count);
+    const topFollowUpDuoi = Array.from(followUpDuoiMap.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count);
+    const topFollowUpTong = Array.from(followUpTongMap.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count);
+    const topFollowUpNumbers = Array.from(followUpNumMap.entries())
+        .map(([number, count]) => ({ number, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+    const nextDayGdbStats = {
+        latestGdbNumber: latestBonus,
+        occurrenceCount,
+        topFollowUpNumbers,
+        topFollowUpDau,
+        topFollowUpDuoi,
+        topFollowUpTong,
+    };
+    // 3. Calculate Đầu/Đuôi/Tổng frequencies and current gaps
     const dauStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
     const duoiStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
     const tongStats = Array.from({ length: 10 }, (_, i) => ({ value: i, appearances: 0, currentGap: 0 }));
@@ -324,31 +367,39 @@ function calculateSpecialPrizeStats(draws) {
             }
         });
     });
-    // Balanced scoring model for Special Prize (Đề/Chạm/Tổng):
-    // Frequency: Max 60 pts based on occurrence rate
-    // Gap Zone Bonus: Max 40 pts based on realistic cycle (8-15 draws sweet spot)
+    // Balanced scoring model for Special Prize (Đề/Chạm/Tổng) with Bạc Nhớ Next-Day integration:
+    // Frequency: Max 50 pts
+    // Gap Zone Bonus: Max 30 pts
+    // Bạc Nhớ Correlation Bonus: Max 20 pts (based on follow-up frequency after latestBonus)
     const getChamPredictions = (type, stats) => {
-        const maxFreq = Math.max(...stats.map(s => s.appearances));
+        const maxFreq = Math.max(...stats.map((s) => s.appearances));
+        const followMap = type === 'CHAM_DAU' ? followUpDauMap : followUpDuoiMap;
         return stats.map((s) => {
-            const freqScore = maxFreq > 0 ? (s.appearances / maxFreq) * 60 : 0;
+            const freqScore = maxFreq > 0 ? (s.appearances / maxFreq) * 50 : 0;
             let gapBonus = 0;
             if (s.currentGap >= 8 && s.currentGap <= 15) {
-                gapBonus = 40; // Sweet spot for Chạm break out
+                gapBonus = 30;
             }
             else if (s.currentGap >= 4 && s.currentGap <= 7) {
-                gapBonus = 25; // Normal expected interval
+                gapBonus = 20;
             }
             else if (s.currentGap <= 3) {
-                gapBonus = 20; // Hot streak retention
+                gapBonus = 15;
             }
             else {
-                gapBonus = 25; // Extreme khan (>15 draws) has risk penalty
+                gapBonus = 15;
             }
-            const totalScore = Number((freqScore + gapBonus).toFixed(1));
+            // Bạc nhớ follow-up bonus
+            const followCount = followMap.get(s.value) || 0;
+            const bacNhoBonus = occurrenceCount > 0 ? (followCount / occurrenceCount) * 20 : 0;
+            const totalScore = Number((freqScore + gapBonus + bacNhoBonus).toFixed(1));
             const prefix = type === 'CHAM_DAU' ? 'Đầu' : 'Đuôi';
             const pct = Math.round((s.appearances / total) * 100);
             let reasoning = `${prefix} ${s.value} tần suất ${pct}%`;
-            if (s.currentGap > 15) {
+            if (followCount > 0 && occurrenceCount > 0) {
+                reasoning = `Bạc nhớ: ${prefix} ${s.value} hay về sau khi GĐB ra ${String(latestBonus).padStart(2, '0')} (${followCount}/${occurrenceCount} lần)`;
+            }
+            else if (s.currentGap > 15) {
                 reasoning = `${prefix} ${s.value} cực khan (Vắng ${s.currentGap} kỳ)`;
             }
             else if (s.currentGap >= 8 && s.currentGap <= 15) {
@@ -370,26 +421,32 @@ function calculateSpecialPrizeStats(draws) {
     const topChamPredictions = [...chamDauPredictions, ...chamDuoiPredictions]
         .sort((a, b) => b.score - a.score)
         .slice(0, 2);
-    const maxTongFreq = Math.max(...tongStats.map(s => s.appearances));
-    const topTongPredictions = tongStats.map((s) => {
-        const freqScore = maxTongFreq > 0 ? (s.appearances / maxTongFreq) * 60 : 0;
+    const maxTongFreq = Math.max(...tongStats.map((s) => s.appearances));
+    const topTongPredictions = tongStats
+        .map((s) => {
+        const freqScore = maxTongFreq > 0 ? (s.appearances / maxTongFreq) * 50 : 0;
         let gapBonus = 0;
         if (s.currentGap >= 8 && s.currentGap <= 15) {
-            gapBonus = 40;
+            gapBonus = 30;
         }
         else if (s.currentGap >= 4 && s.currentGap <= 7) {
-            gapBonus = 25;
-        }
-        else if (s.currentGap <= 3) {
             gapBonus = 20;
         }
-        else {
-            gapBonus = 25;
+        else if (s.currentGap <= 3) {
+            gapBonus = 15;
         }
-        const totalScore = Number((freqScore + gapBonus).toFixed(1));
+        else {
+            gapBonus = 15;
+        }
+        const followCount = followUpTongMap.get(s.value) || 0;
+        const bacNhoBonus = occurrenceCount > 0 ? (followCount / occurrenceCount) * 20 : 0;
+        const totalScore = Number((freqScore + gapBonus + bacNhoBonus).toFixed(1));
         const pct = Math.round((s.appearances / total) * 100);
         let reasoning = `Tổng đề ${s.value} tần suất ${pct}%`;
-        if (s.currentGap > 15) {
+        if (followCount > 0 && occurrenceCount > 0) {
+            reasoning = `Bạc nhớ: Tổng ${s.value} hay về sau khi GĐB ra ${String(latestBonus).padStart(2, '0')} (${followCount}/${occurrenceCount} lần)`;
+        }
+        else if (s.currentGap > 15) {
             reasoning = `Tổng đề ${s.value} cực khan (Vắng ${s.currentGap} kỳ)`;
         }
         else if (s.currentGap >= 8 && s.currentGap <= 15) {
@@ -411,6 +468,7 @@ function calculateSpecialPrizeStats(draws) {
         topChamPredictions,
         topTongPredictions,
         mostLaggingSpecialNumber,
+        nextDayGdbStats,
     };
 }
 /**

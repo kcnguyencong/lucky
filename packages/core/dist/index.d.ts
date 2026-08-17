@@ -70,6 +70,26 @@ export interface SpecialPrizePrediction {
     score: number;
     reasoning: string;
 }
+export interface NextDayGdbStats {
+    latestGdbNumber: number;
+    occurrenceCount: number;
+    topFollowUpNumbers: Array<{
+        number: number;
+        count: number;
+    }>;
+    topFollowUpDau: Array<{
+        value: number;
+        count: number;
+    }>;
+    topFollowUpDuoi: Array<{
+        value: number;
+        count: number;
+    }>;
+    topFollowUpTong: Array<{
+        value: number;
+        count: number;
+    }>;
+}
 export interface SpecialPrizeSummary {
     topChamPredictions: SpecialPrizePrediction[];
     topTongPredictions: SpecialPrizePrediction[];
@@ -78,6 +98,7 @@ export interface SpecialPrizeSummary {
         currentGap: number;
         maxGap: number;
     } | null;
+    nextDayGdbStats?: NextDayGdbStats | null;
 }
 export interface OverviewSummary {
     totalDraws: number;
@@ -93,7 +114,8 @@ export interface OverviewSummary {
     specialPrizeSummary: SpecialPrizeSummary;
 }
 /**
- * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies and Tổng Đề omission gaps.
+ * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies, Tổng Đề omission gaps,
+ * and Next-Day GĐB Bạc Nhớ Correlation (mketqua.net statistics).
  */
 export declare function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSummary;
 /**
