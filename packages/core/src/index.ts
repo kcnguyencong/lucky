@@ -316,9 +316,16 @@ export interface NextDayGdbStats {
   topFollowUpTong: Array<{ value: number; count: number }>;
 }
 
+export interface GdbNumberPrediction {
+  number: number;
+  score: number;
+  reasoning: string;
+}
+
 export interface SpecialPrizeSummary {
   topChamPredictions: SpecialPrizePrediction[];
   topTongPredictions: SpecialPrizePrediction[];
+  topGdbPredictions: GdbNumberPrediction[];
   mostLaggingSpecialNumber: {
     number: number;
     currentGap: number;
@@ -354,6 +361,7 @@ export function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSum
     return {
       topChamPredictions: [],
       topTongPredictions: [],
+      topGdbPredictions: [],
       mostLaggingSpecialNumber: null,
       nextDayGdbStats: null,
     };
@@ -579,9 +587,76 @@ export function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSum
     .sort((a, b) => b.score - a.score)
     .slice(0, 2);
 
+  // 5. Top 4 GĐB Number Predictions (00-99) — Multi-Factor Model
+  // Combines Bạc Nhớ Transition (40 pts) + Personal Cycle Alignment (35 pts) + Short-Term Frequency (25 pts)
+  const sortedDescGdb = [...validDraws].reverse(); // newest first
+  const latestBonusNum = latestBonus;
+
+  // Short-term frequency over last 15 GĐB draws (decay 0.9)
+  const gdbRecentFreq = new Map<number, number>();
+  for (let i = 0; i <= 99; i++) gdbRecentFreq.set(i, 0);
+  const gdbShortWindow = Math.min(15, sortedDescGdb.length);
+  for (let i = 0; i < gdbShortWindow; i++) {
+    const w = Math.pow(0.9, i);
+    const n = sortedDescGdb[i].bonusNumber!;
+    gdbRecentFreq.set(n, (gdbRecentFreq.get(n) || 0) + w);
+  }
+  const maxGdbRecent = Math.max(...Array.from(gdbRecentFreq.values())) || 1;
+
+  // Personal cycle alignment for each GĐB number
+  const gdbCycleScores = new Map<number, { score: number; curGap: number; avgGap: number }>();
+  for (let num = 0; num <= 99; num++) {
+    let curGap = 0;
+    for (const d of sortedDescGdb) {
+      if (d.bonusNumber === num) break;
+      curGap++;
+    }
+    const gaps: number[] = [];
+    let g = 0;
+    for (const d of [...sortedDescGdb].reverse()) {
+      if (d.bonusNumber === num) { gaps.push(g); g = 0; } else { g++; }
+    }
+    const avgGap = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 15;
+    let cycleScore = 0;
+    if (avgGap >= 2) {
+      const ratio = curGap / avgGap;
+      if (ratio >= 0.8 && ratio <= 1.3) cycleScore = 35;
+      else if (ratio >= 0.5 && ratio < 0.8) cycleScore = 18;
+      else if (curGap === 1) cycleScore = 12;
+    } else if (curGap <= 2) {
+      cycleScore = 20;
+    }
+    gdbCycleScores.set(num, { score: cycleScore, curGap, avgGap: Number(avgGap.toFixed(1)) });
+  }
+
+  // Bạc Nhớ Transition bonus: probability of num appearing after latestBonusNum
+  const maxFollowUpCount = Math.max(...Array.from(followUpNumMap.values()), 1);
+
+  const topGdbPredictions: GdbNumberPrediction[] = Array.from({ length: 100 }, (_, num) => {
+    const freqScore = (gdbRecentFreq.get(num)! / maxGdbRecent) * 25;
+    const { score: cScore, curGap, avgGap } = gdbCycleScores.get(num)!;
+    const followCount = followUpNumMap.get(num) || 0;
+    const bacNhoScore = occurrenceCount > 0 ? (followCount / Math.max(occurrenceCount, 1)) * 40 : 0;
+    const totalScore = Number((freqScore + cScore + bacNhoScore).toFixed(1));
+
+    let reasoning = `Nhịp nổ gần đây tốt`;
+    if (bacNhoScore > 15) {
+      reasoning = `Bạc nhớ: hay về ngày sau GĐB ${String(latestBonusNum).padStart(2, '0')} (${followCount}/${occurrenceCount} lần)`;
+    } else if (cScore === 35) {
+      reasoning = `Đúng chu kỳ nổ cá nhân (Vắng ${curGap} kỳ ~ TB ${avgGap} kỳ)`;
+    } else if (curGap === 1) {
+      reasoning = `Nghỉ 1 kỳ – dây nóng`;
+    }
+
+    return { number: num, score: totalScore, reasoning };
+  })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
   return {
     topChamPredictions,
     topTongPredictions,
+    topGdbPredictions,
     mostLaggingSpecialNumber,
     nextDayGdbStats,
   };
@@ -602,6 +677,7 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
       specialPrizeSummary: {
         topChamPredictions: [],
         topTongPredictions: [],
+        topGdbPredictions: [],
         mostLaggingSpecialNumber: null,
       },
     };

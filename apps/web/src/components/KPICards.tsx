@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Flame, Award, CheckCircle2, XCircle, Target, Calculator } from 'lucide-react';
+import { Award, CheckCircle2, XCircle, Target, Calculator, Star } from 'lucide-react';
 
 interface KPICardsProps {
   summary: {
@@ -54,6 +54,11 @@ interface KPICardsProps {
       topTongPredictions: Array<{
         type: 'TONG';
         value: number;
+        score: number;
+        reasoning: string;
+      }>;
+      topGdbPredictions?: Array<{
+        number: number;
         score: number;
         reasoning: string;
       }>;
@@ -230,23 +235,31 @@ export function KPICards({ summary }: KPICardsProps) {
         </p>
       </div>
 
-      {/* CARD 5: Số Lô Hot Nhất */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg backdrop-blur-sm transition-all hover:border-slate-700/60">
+      {/* CARD 5: Top 4 Dự Đoán Số Đặc Biệt */}
+      <div className="bg-gradient-to-br from-rose-950/40 to-orange-950/40 border border-rose-500/30 rounded-xl p-5 shadow-lg backdrop-blur-sm relative overflow-hidden transition-all hover:border-rose-500/50">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-400">Số Lô Hot Nhất</span>
-          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-            <Flame className="w-5 h-5" />
+          <span className="text-sm font-semibold text-rose-300">Top 4 Dự Đoán Đặc Biệt</span>
+          <div className="p-2 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-400/30">
+            <Star className="w-5 h-5" />
           </div>
         </div>
-        <div className="flex items-baseline space-x-3">
-          <span className="text-3xl font-extrabold text-amber-400">
-            {summary.hottestNumber ? String(summary.hottestNumber.number).padStart(2, '0') : '--'}
-          </span>
-          <span className="text-sm text-slate-300 font-bold">
-            {summary.hottestNumber?.appearances} lần ({summary.hottestNumber?.percentage}%)
-          </span>
+        <div className="flex items-center justify-around gap-2 my-2">
+          {(spSummary?.topGdbPredictions || []).map((item, idx) => (
+            <div key={idx} className="flex flex-col items-center">
+              <span className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-br from-rose-500 to-orange-500 border border-rose-300/30 text-white text-sm font-extrabold rounded-xl shadow-md shadow-rose-950/50">
+                {String(item.number).padStart(2, '0')}
+              </span>
+              <span className="text-[10px] text-rose-300 font-semibold mt-1">{item.score}đ</span>
+            </div>
+          ))}
+          {(!spSummary?.topGdbPredictions || spSummary.topGdbPredictions.length === 0) && (
+            <span className="text-xs text-slate-400">Đang tính toán...</span>
+          )}
         </div>
-        <p className="text-xs text-slate-500 mt-2 font-medium">Tần suất về cao nhất trên 27 giải</p>
+        <p className="text-xs text-rose-400 mt-2 font-bold">
+          Dự báo ngày {nextDrawDateStr} • 2 số cuối GĐB
+        </p>
       </div>
 
     </div>

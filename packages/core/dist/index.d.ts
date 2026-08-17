@@ -90,9 +90,15 @@ export interface NextDayGdbStats {
         count: number;
     }>;
 }
+export interface GdbNumberPrediction {
+    number: number;
+    score: number;
+    reasoning: string;
+}
 export interface SpecialPrizeSummary {
     topChamPredictions: SpecialPrizePrediction[];
     topTongPredictions: SpecialPrizePrediction[];
+    topGdbPredictions: GdbNumberPrediction[];
     mostLaggingSpecialNumber: {
         number: number;
         currentGap: number;
