@@ -73,15 +73,22 @@ export async function getMergedDraws(forceRefresh = false): Promise<DrawRecord[]
     return cachedDraws;
   }
 
-  // Load baseline static draws
-  const baseDraws: DrawRecord[] = (rawDraws as any[]).map((d: any) => ({
-    id: String(d.drawId),
-    drawId: d.drawId,
-    lotteryType: d.lotteryType || 'MEGA_645',
-    drawDate: d.drawDate,
-    numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
-    bonusNumber: d.bonusNumber || null,
-  }));
+  // Load baseline static draws and deduplicate by drawId
+  const baseDrawsMap = new Map<string, DrawRecord>();
+  (rawDraws as any[]).forEach((d: any) => {
+    if (!baseDrawsMap.has(d.drawId)) {
+      baseDrawsMap.set(d.drawId, {
+        id: String(d.drawId),
+        drawId: d.drawId,
+        lotteryType: d.lotteryType || 'MEGA_645',
+        drawDate: d.drawDate,
+        numbers: Array.isArray(d.numbers) ? d.numbers : JSON.parse(d.numbers || '[]'),
+        bonusNumber: d.bonusNumber || null,
+      });
+    }
+  });
+  const baseDraws = Array.from(baseDrawsMap.values());
+
 
   try {
     console.log('[LiveScraper] Fetching latest draws from mketqua.net...');

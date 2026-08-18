@@ -48,14 +48,16 @@ async function main() {
     console.log('====================================================');
     const scraper = new scraper_1.LotteryScraper();
     const dbSync = new db_sync_1.DatabaseSync();
-    // Scrape MEGA_645 and POWER_655 results
-    const megaDraws = await scraper.runScrape('MEGA_645');
-    const powerDraws = await scraper.runScrape('POWER_655');
-    const allDraws = [...megaDraws, ...powerDraws];
+    // Scrape XSMB results (labeled as MEGA_645 for web compatibility)
+    const draws = await scraper.runScrape('MEGA_645');
+    // Deduplicate by drawId to ensure clean data
+    const uniqueDrawsMap = new Map();
+    draws.forEach((d) => uniqueDrawsMap.set(d.drawId, d));
+    const uniqueDraws = Array.from(uniqueDrawsMap.values());
     // 1. Export raw JSON artifact
-    dbSync.exportToJson(allDraws);
+    dbSync.exportToJson(uniqueDraws);
     // 2. Upsert data into local SQLite database via Prisma ORM
-    await dbSync.upsertToDatabase(allDraws);
+    await dbSync.upsertToDatabase(uniqueDraws);
     console.log('====================================================');
     console.log('✅ Scraper pipeline completed successfully!');
     console.log('====================================================');
