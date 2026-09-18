@@ -49,15 +49,16 @@ export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: numbe
  */
 export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v5 (Multi-Factor Model).
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v6 (Explosive Predictive Model).
  *
  * Design Rationale:
- * - Does NOT rely on raw cumulative overall historical hits (which biases toward stale top-hit numbers).
  * - Multi-Factor Scoring Architecture:
- *   1. Short-Term Momentum (Window 12 draws with decay, max 45 pts).
- *   2. Personal Cycle Alignment (Gap-to-AvgElasticity, max 30 pts): Rewards numbers hitting their personal historical mean gap sweet spot.
- *   3. Pair Coupling / Bạc Nhớ (Co-occurrence with previous draw numbers, max 25 pts).
- *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws to prevent over-saturated picks.
+ *   1. Short-Term Momentum (Window 15 draws with steeper 0.85 decay, max 35 pts).
+ *   2. Personal Cycle Alignment & Max Gap Rebound (max 40 pts):
+ *      - Rewards numbers hitting their personal historical mean gap sweet spot.
+ *      - Super Bonus for numbers that reach >= 90% of their historical max gap (Explosive rebound).
+ *   3. Global Next-Day Bạc Nhớ Transition (max 25 pts): Analyzes all historical draws to find what numbers follow the current draw's numbers.
+ *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws.
  */
 export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
     number: number;
@@ -121,7 +122,7 @@ export interface OverviewSummary {
 }
 /**
  * Calculates GĐB (Đề) specific statistics, including Đầu/Đuôi frequencies, Tổng Đề omission gaps,
- * and Next-Day GĐB Bạc Nhớ Correlation (mketqua.net statistics).
+ * Next-Day GĐB Bạc Nhớ, and Day-Of-Week Bạc Nhớ (Algorithm v6).
  */
 export declare function calculateSpecialPrizeStats(draws: DrawRecord[]): SpecialPrizeSummary;
 /**
