@@ -60,7 +60,11 @@ class DrawParser {
             }
             // 2. Tạo drawId duy nhất dựa trên ngày
             const dateKey = drawDateStr.substring(0, 10).replace(/-/g, '');
-            const drawId = `MB-${dateKey}`;
+            let drawId = `MB-${dateKey}`;
+            if (lotteryType === 'MEGA_645')
+                drawId = `M645-${dateKey}`;
+            if (lotteryType === 'POWER_655')
+                drawId = `P655-${dateKey}`;
             // 3. Bóc tách danh sách tất cả các số trúng thưởng trong bảng
             const numbers = [];
             let specialNumber = undefined;
