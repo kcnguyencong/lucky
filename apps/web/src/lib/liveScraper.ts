@@ -56,7 +56,7 @@ function parseHTML(html: string): DrawRecord[] {
       results.push({
         id: drawId,
         drawId: drawId,
-        lotteryType: 'MEGA_645', // Kept consistent with front-end filter
+        lotteryType: 'XSMB',
         drawDate: drawDateStr,
         numbers: numbers,
         bonusNumber: specialNumber,

@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const refresh = searchParams.get('refresh') === 'true';
 
     const draws = await getMergedDraws(refresh);
-    const summary = generateOverviewSummary(draws);
+    const lotoDraws = draws.filter(d => d.lotteryType === 'XSMB');
+    const summary = generateOverviewSummary(lotoDraws);
 
     // Calculate validation for the most recent draw (prediction accuracy)
     let lastDrawValidation = null;
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       const pastHistory = draws.slice(1);
       
       // Predict what the numbers would be for the latestDraw, using only pastHistory
-      const pastPredictions = predictTopNumbers(pastHistory, 2);
+      const pastPredictions = predictTopNumbers(pastHistory.filter(d => d.lotteryType === 'XSMB'), 2);
       
       const validatedPredictions = pastPredictions.map((pred) => {
         const isHit = latestDraw.numbers.includes(pred.number);
