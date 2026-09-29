@@ -153,16 +153,14 @@ export function calculateTopPairs(draws: DrawRecord[], topN: number = 10): PairS
 }
 
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v6 (Explosive Predictive Model).
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v7 (Trend Following & Cluster Model).
  *
  * Design Rationale:
+ * - Shift away from "Max Gap Rebound" (Lô Gan) as it proved too risky.
  * - Multi-Factor Scoring Architecture:
- *   1. Short-Term Momentum (Window 15 draws with steeper 0.85 decay, max 35 pts).
- *   2. Personal Cycle Alignment & Max Gap Rebound (max 40 pts): 
- *      - Rewards numbers hitting their personal historical mean gap sweet spot.
- *      - Super Bonus for numbers that reach >= 90% of their historical max gap (Explosive rebound).
- *   3. Global Next-Day Bạc Nhớ Transition (max 25 pts): Analyzes all historical draws to find what numbers follow the current draw's numbers.
- *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws.
+ *   1. Cluster Model & Lô Rơi (Max 40 pts): Rewards numbers that appeared recently (gap 0, 1, 2) and heavily penalizes Lô Gan (gap > 12).
+ *   2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts): Rewards numbers belonging to currently hot Heads/Tails, or Heads/Tails that were missing in the previous draw (Cầu Đầu Câm).
+ *   3. Short-Term Transition Matrix (Max 25 pts): Analyzes only the last 100 draws for short-term Bạc Nhớ trends.
  */
 export function predictTopNumbers(
   draws: DrawRecord[],
@@ -178,27 +176,9 @@ export function predictTopNumbers(
   const sortedAsc = [...sortedDesc].reverse();
   const latestDrawNums = new Set(sortedDesc[0].numbers);
 
-  // 1. Short-Term Momentum (Window of 15 draws, max 35 pts)
-  const shortWindow = Math.min(15, sortedDesc.length);
-  const recentFreq = new Map<number, number>();
-  for (let i = 0; i <= maxNumber; i++) recentFreq.set(i, 0);
-
-  for (let i = 0; i < shortWindow; i++) {
-    const weight = Math.pow(0.85, i); // Steeper decay
-    const uniqueNums = new Set(sortedDesc[i].numbers);
-    uniqueNums.forEach((num) => {
-      if (num <= maxNumber) {
-        recentFreq.set(num, (recentFreq.get(num) || 0) + weight);
-      }
-    });
-  }
-  const maxRecent = Math.max(...Array.from(recentFreq.values())) || 1;
-
-  // 2. Personal Cycle Alignment & Max Gap Rebound (max 40 pts)
+  // 1. Cluster Model & Lô Rơi (Max 40 pts) & Phạt Lô Gan (-50 pts)
   const currentGapMap = new Map<number, number>();
-  const avgGapMap = new Map<number, number>();
-  const maxGapMap = new Map<number, number>();
-  const cycleMatchScores = new Map<number, number>();
+  const clusterScores = new Map<number, number>();
 
   for (let num = 0; num <= maxNumber; num++) {
     let curGap = 0;
@@ -208,52 +188,74 @@ export function predictTopNumbers(
     }
     currentGapMap.set(num, curGap);
 
-    const gaps: number[] = [];
-    let g = 0;
-    let maxG = 0;
-    
-    sortedAsc.forEach((d) => {
-      if (d.numbers.includes(num)) {
-        gaps.push(g);
-        if (g > maxG) maxG = g;
-        g = 0;
-      } else {
-        g++;
-      }
-    });
-    
-    const historicalMaxG = Math.max(maxG, 1);
-    maxGapMap.set(num, historicalMaxG);
-
-    const avgG = gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 8;
-    avgGapMap.set(num, Number(avgG.toFixed(1)));
-
-    let cycleScore = 0;
-    const gapRatioToMax = curGap / historicalMaxG;
-    
-    if (historicalMaxG >= 10 && gapRatioToMax >= 0.9) {
-      cycleScore = 40; // Max Gap Rebound Super Bonus
-    } else if (avgG >= 2) {
-      const ratio = curGap / avgG;
-      if (ratio >= 0.85 && ratio <= 1.25) {
-        cycleScore = 30; // Sweet spot explosion timing
-      } else if (ratio >= 0.6 && ratio < 0.85) {
-        cycleScore = 20; // Entering sweet spot window
-      } else if (curGap === 1 || curGap === 2) {
-        cycleScore = 15; // Regular rhythm
-      }
-    } else {
-      if (curGap === 1 || curGap === 2) cycleScore = 18;
+    let score = 0;
+    if (curGap > 12) {
+      score = -50; // Phạt nặng Lô Gan
+    } else if (curGap === 0) {
+      score = 40; // Lô rơi từ kỳ trước
+    } else if (curGap === 1) {
+      score = 30; // Nhịp cách 1 ngày
+    } else if (curGap === 2) {
+      score = 20; // Nhịp cách 2 ngày
+    } else if (curGap <= 5) {
+      score = 10; // Đang trong vùng an toàn
     }
-    cycleMatchScores.set(num, cycleScore);
+    clusterScores.set(num, score);
   }
 
-  // 3. Global Next-Day Bạc Nhớ Transition (max 25 pts)
-  const transitionMatrix = new Map<string, number>();
+  // 2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts)
+  const headFreq = new Array(10).fill(0);
+  const tailFreq = new Array(10).fill(0);
+  const shortWindow = Math.min(7, sortedDesc.length);
   
-  for (let i = 0; i < sortedAsc.length - 1; i++) {
-    const todayNums = new Set(sortedAsc[i].numbers);
-    const tmrNums = new Set(sortedAsc[i + 1].numbers);
+  for (let i = 0; i < shortWindow; i++) {
+    const nums = new Set(sortedDesc[i].numbers);
+    nums.forEach(num => {
+      headFreq[Math.floor(num / 10)]++;
+      tailFreq[num % 10]++;
+    });
+  }
+  
+  const maxHeadFreq = Math.max(...headFreq, 1);
+  const maxTailFreq = Math.max(...tailFreq, 1);
+
+  // Đầu câm / Đuôi câm ở kỳ quay MỚI NHẤT
+  const latestHeadFreq = new Array(10).fill(0);
+  const latestTailFreq = new Array(10).fill(0);
+  latestDrawNums.forEach(num => {
+    latestHeadFreq[Math.floor(num / 10)]++;
+    latestTailFreq[num % 10]++;
+  });
+
+  const missingHeads = new Set<number>();
+  const missingTails = new Set<number>();
+  for (let i = 0; i < 10; i++) {
+    if (latestHeadFreq[i] === 0) missingHeads.add(i);
+    if (latestTailFreq[i] === 0) missingTails.add(i);
+  }
+
+  const momentumScores = new Map<number, number>();
+  for (let num = 0; num <= maxNumber; num++) {
+    const head = Math.floor(num / 10);
+    const tail = num % 10;
+    
+    let score = ((headFreq[head] / maxHeadFreq) * 10) + ((tailFreq[tail] / maxTailFreq) * 10);
+    
+    // Thưởng Đầu/Đuôi câm
+    if (missingHeads.has(head)) score += 15;
+    if (missingTails.has(tail)) score += 15;
+    
+    momentumScores.set(num, Math.min(score, 35)); // Cap at 35
+  }
+
+  // 3. Short-Term Transition Matrix (Last 100 draws, max 25 pts)
+  const transitionMatrix = new Map<string, number>();
+  const transitionWindow = Math.min(100, sortedAsc.length);
+  const recentAsc = sortedAsc.slice(sortedAsc.length - transitionWindow);
+  
+  for (let i = 0; i < recentAsc.length - 1; i++) {
+    const todayNums = new Set(recentAsc[i].numbers);
+    const tmrNums = new Set(recentAsc[i + 1].numbers);
     
     todayNums.forEach(prev => {
       tmrNums.forEach(next => {
@@ -274,40 +276,37 @@ export function predictTopNumbers(
     if (score > maxBacNho) maxBacNho = score;
   }
 
-  // 4. Saturation Penalty (-15 pts for 3+ consecutive hits)
-  const saturationPenalty = new Map<number, number>();
-  for (let num = 0; num <= maxNumber; num++) {
-    let streak = 0;
-    for (let i = 0; i < Math.min(4, sortedDesc.length); i++) {
-      if (sortedDesc[i].numbers.includes(num)) streak++;
-      else break;
-    }
-    saturationPenalty.set(num, streak >= 3 ? -15 : 0);
-  }
-
-  // Combine Scores
+  // 4. Combine Scores
   const scores = Array.from({ length: maxNumber + 1 }, (_, num) => {
-    const mScore = (recentFreq.get(num)! / maxRecent) * 35;
-    const cScore = cycleMatchScores.get(num) || 0;
+    const clusterScore = clusterScores.get(num)!;
+    const mScore = momentumScores.get(num)!;
     const bScore = (bacNhoScores.get(num)! / maxBacNho) * 25;
-    const sPenalty = saturationPenalty.get(num) || 0;
 
-    const totalScore = Number((mScore + cScore + bScore + sPenalty).toFixed(1));
+    const totalScore = Number((clusterScore + mScore + bScore).toFixed(1));
     const curG = currentGapMap.get(num)!;
-    const avgG = avgGapMap.get(num)!;
-    const maxG = maxGapMap.get(num)!;
+    const head = Math.floor(num / 10);
+    const tail = num % 10;
 
-    let reasoning = `Phong độ gần đây tốt`;
-    if (cScore === 40) {
-      reasoning = `💥 Bùng nổ: Chạm ngưỡng cực đại (Vắng ${curG}/${maxG} kỳ)`;
-    } else if (cScore >= 30) {
-      reasoning = `Rơi đúng điểm nổ chu kỳ cá nhân (Vắng ${curG} kỳ ~ TB ${avgG} kỳ)`;
-    } else if (bScore >= 20) {
-      reasoning = `Bạc nhớ toàn cục: Hay về ngay sau kết quả kỳ trước`;
-    } else if (curG === 1 || curG === 2) {
-      reasoning = `Nhịp nổ 1-2 kỳ đều đặn`;
-    } else if (sPenalty < 0) {
-      reasoning = `Cảnh báo: Dấu hiệu bão hòa (Nổ 3+ kỳ liên tiếp)`;
+    let reasoning = `Phong độ ổn định`;
+    
+    if (curG > 12) {
+      reasoning = `Lô Gan rủi ro cao (Vắng ${curG} kỳ)`;
+    } else if (missingHeads.has(head) || missingTails.has(tail)) {
+      if (missingHeads.has(head) && missingTails.has(tail)) {
+         reasoning = `💥 Cầu báo Kép Câm: Đầu ${head} & Đuôi ${tail} cùng câm`;
+      } else if (missingHeads.has(head)) {
+         reasoning = `🔥 Cầu Đầu Câm: Bắt lại Đầu ${head} (Câm kỳ trước)`;
+      } else {
+         reasoning = `🔥 Cầu Đuôi Câm: Bắt lại Đuôi ${tail} (Câm kỳ trước)`;
+      }
+    } else if (clusterScore === 40) {
+      reasoning = `♻️ Bắt Lô rơi kỳ trước`;
+    } else if (bScore >= 18) {
+      reasoning = `Bạc nhớ ngắn hạn (100 kỳ): Dễ nổ sau bộ số hôm qua`;
+    } else if (curG === 1) {
+      reasoning = `Nhịp nghỉ 1 ngày đẹp`;
+    } else if (mScore >= 20) {
+      reasoning = `Ăn theo sức mạnh Đầu/Đuôi đang về nhiều`;
     }
 
     return { number: num, score: totalScore, reasoning };

@@ -49,16 +49,14 @@ export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: numbe
  */
 export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v6 (Explosive Predictive Model).
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v7 (Trend Following & Cluster Model).
  *
  * Design Rationale:
+ * - Shift away from "Max Gap Rebound" (Lô Gan) as it proved too risky.
  * - Multi-Factor Scoring Architecture:
- *   1. Short-Term Momentum (Window 15 draws with steeper 0.85 decay, max 35 pts).
- *   2. Personal Cycle Alignment & Max Gap Rebound (max 40 pts):
- *      - Rewards numbers hitting their personal historical mean gap sweet spot.
- *      - Super Bonus for numbers that reach >= 90% of their historical max gap (Explosive rebound).
- *   3. Global Next-Day Bạc Nhớ Transition (max 25 pts): Analyzes all historical draws to find what numbers follow the current draw's numbers.
- *   4. Saturation Penalty (-15 pts): Penalizes numbers that appeared 3+ consecutive draws.
+ *   1. Cluster Model & Lô Rơi (Max 40 pts): Rewards numbers that appeared recently (gap 0, 1, 2) and heavily penalizes Lô Gan (gap > 12).
+ *   2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts): Rewards numbers belonging to currently hot Heads/Tails, or Heads/Tails that were missing in the previous draw (Cầu Đầu Câm).
+ *   3. Short-Term Transition Matrix (Max 25 pts): Analyzes only the last 100 draws for short-term Bạc Nhớ trends.
  */
 export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
     number: number;
