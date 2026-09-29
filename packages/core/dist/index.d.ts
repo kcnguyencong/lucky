@@ -24,18 +24,6 @@ export interface PairStat {
     pair: [number, number];
     count: number;
 }
-export interface OverviewSummary {
-    totalDraws: number;
-    latestDraw: DrawRecord | null;
-    hottestNumber: FrequencyStat | null;
-    coldestNumber: FrequencyStat | null;
-    mostLaggingNumber: GapStat | null;
-    topPredictions: Array<{
-        number: number;
-        score: number;
-        reasoning: string;
-    }>;
-}
 /**
  * Calculates frequency and gap metrics for all numbers (00 to 99) based on draw history.
  */
@@ -127,3 +115,17 @@ export declare function calculateSpecialPrizeStats(draws: DrawRecord[]): Special
  * Generates overall summary stats for executive KPIs.
  */
 export declare function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary;
+export interface VietlottPredictionTicket {
+    numbers: number[];
+    bonusNumber?: number;
+    stats: {
+        evenCount: number;
+        oddCount: number;
+        sum: number;
+    };
+    reasoning: string;
+}
+/**
+ * Predicts a set of 6 numbers for Vietlott Mega 6/45 or Power 6/55.
+ */
+export declare function predictVietlott(draws: DrawRecord[], type: '6/45' | '6/55'): VietlottPredictionTicket;

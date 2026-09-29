@@ -52,11 +52,34 @@ server.get('/health', async () => {
 // GET /api/summary - High level KPI Overview
 server.get('/api/summary', async (request, reply) => {
     const dbDraws = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'XSMB' },
         orderBy: { drawDate: 'desc' },
     });
     const draws = dbDraws.map(formatDrawRecord);
     const summary = (0, core_1.generateOverviewSummary)(draws);
     return { success: true, data: summary };
+});
+// GET /api/predictions/vietlott - Vietlott Predictions
+server.get('/api/predictions/vietlott', async (request, reply) => {
+    const dbDrawsMega = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'MEGA_645' },
+        orderBy: { drawDate: 'desc' },
+    });
+    const dbDrawsPower = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'POWER_655' },
+        orderBy: { drawDate: 'desc' },
+    });
+    const drawsMega = dbDrawsMega.map(formatDrawRecord);
+    const drawsPower = dbDrawsPower.map(formatDrawRecord);
+    const megaPrediction = (0, core_1.predictVietlott)(drawsMega, '6/45');
+    const powerPrediction = (0, core_1.predictVietlott)(drawsPower, '6/55');
+    return {
+        success: true,
+        data: {
+            mega645: megaPrediction,
+            power655: powerPrediction,
+        }
+    };
 });
 // GET /api/draws - Paginated draw list with search
 server.get('/api/draws', async (request, reply) => {
@@ -91,6 +114,7 @@ server.get('/api/draws', async (request, reply) => {
 // GET /api/stats/frequency - Frequency stats for 00-99
 server.get('/api/stats/frequency', async (request, reply) => {
     const dbDraws = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'XSMB' },
         orderBy: { drawDate: 'desc' },
     });
     const draws = dbDraws.map(formatDrawRecord);
@@ -100,6 +124,7 @@ server.get('/api/stats/frequency', async (request, reply) => {
 // GET /api/stats/gap - Omission gap stats for 00-99
 server.get('/api/stats/gap', async (request, reply) => {
     const dbDraws = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'XSMB' },
         orderBy: { drawDate: 'desc' },
     });
     const draws = dbDraws.map(formatDrawRecord);
@@ -109,6 +134,7 @@ server.get('/api/stats/gap', async (request, reply) => {
 // GET /api/stats/pairs - Top co-occurring pairs
 server.get('/api/stats/pairs', async (request, reply) => {
     const dbDraws = await database_1.prisma.lotteryDraw.findMany({
+        where: { lotteryType: 'XSMB' },
         orderBy: { drawDate: 'desc' },
     });
     const draws = dbDraws.map(formatDrawRecord);

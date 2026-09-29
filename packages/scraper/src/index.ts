@@ -14,12 +14,20 @@ async function main() {
   const scraper = new LotteryScraper();
   const dbSync = new DatabaseSync();
 
-  // Scrape XSMB results (labeled as MEGA_645 for web compatibility)
-  const draws = await scraper.runScrape('MEGA_645');
+  // Scrape XSMB results (labeled as XSMB)
+  const drawsMB = await scraper.runScrape('XSMB');
+
+  // Scrape Vietlott Mega 6/45
+  const drawsMega = await scraper.runScrape('MEGA_645');
+
+  // Scrape Vietlott Power 6/55
+  const drawsPower = await scraper.runScrape('POWER_655');
+
+  const allDraws = [...drawsMB, ...drawsMega, ...drawsPower];
 
   // Deduplicate by drawId to ensure clean data
-  const uniqueDrawsMap = new Map<string, typeof draws[0]>();
-  draws.forEach((d) => uniqueDrawsMap.set(d.drawId, d));
+  const uniqueDrawsMap = new Map<string, typeof allDraws[0]>();
+  allDraws.forEach((d) => uniqueDrawsMap.set(d.drawId, d));
   const uniqueDraws = Array.from(uniqueDrawsMap.values());
 
   // 1. Export raw JSON artifact

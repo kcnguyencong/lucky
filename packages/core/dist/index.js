@@ -6,6 +6,7 @@ exports.calculateTopPairs = calculateTopPairs;
 exports.predictTopNumbers = predictTopNumbers;
 exports.calculateSpecialPrizeStats = calculateSpecialPrizeStats;
 exports.generateOverviewSummary = generateOverviewSummary;
+exports.predictVietlott = predictVietlott;
 /**
  * Calculates frequency and gap metrics for all numbers (00 to 99) based on draw history.
  */
@@ -656,5 +657,146 @@ function generateOverviewSummary(draws) {
         mostLaggingNumber: sortedByGap[0] || null,
         topPredictions: predictions,
         specialPrizeSummary: calculateSpecialPrizeStats(draws),
+    };
+}
+/**
+ * Predicts a set of 6 numbers for Vietlott Mega 6/45 or Power 6/55.
+ */
+function predictVietlott(draws, type) {
+    const maxNumber = type === '6/45' ? 45 : 55;
+    const targetSum = type === '6/45' ? 138 : 168; // Ideal bell curve center
+    if (draws.length === 0) {
+        return {
+            numbers: [1, 2, 3, 4, 5, 6],
+            stats: { evenCount: 3, oddCount: 3, sum: 21 },
+            reasoning: 'Fallback',
+        };
+    }
+    // 1. Analyze frequencies and gaps
+    const sortedDesc = [...draws].sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
+    const freqMap = new Map();
+    const gapMap = new Map();
+    for (let num = 1; num <= maxNumber; num++) {
+        freqMap.set(num, 0);
+        let gap = 0;
+        for (const draw of sortedDesc) {
+            if (draw.numbers.includes(num))
+                break;
+            gap++;
+        }
+        gapMap.set(num, gap);
+    }
+    const shortWindow = Math.min(30, sortedDesc.length);
+    for (let i = 0; i < shortWindow; i++) {
+        sortedDesc[i].numbers.forEach((num) => {
+            if (num >= 1 && num <= maxNumber) {
+                freqMap.set(num, (freqMap.get(num) || 0) + 1);
+            }
+        });
+    }
+    const sortedByFreq = Array.from(freqMap.entries())
+        .sort((a, b) => b[1] - a[1] || gapMap.get(a[0]) - gapMap.get(b[0]));
+    const sortedByGap = Array.from(gapMap.entries()).sort((a, b) => b[1] - a[1]);
+    const selectedNumbers = new Set();
+    // 1. Pick 2 Hot
+    let hotCount = 0;
+    for (const [num] of sortedByFreq) {
+        if (hotCount < 2 && !selectedNumbers.has(num)) {
+            selectedNumbers.add(num);
+            hotCount++;
+        }
+    }
+    // 2. Pick 1 Cold
+    for (const [num] of sortedByGap) {
+        if (!selectedNumbers.has(num)) {
+            selectedNumbers.add(num);
+            break;
+        }
+    }
+    // 3. Add 1 consecutive
+    let consecutiveAdded = false;
+    for (const num of Array.from(selectedNumbers)) {
+        if (!selectedNumbers.has(num + 1) && num + 1 <= maxNumber) {
+            selectedNumbers.add(num + 1);
+            consecutiveAdded = true;
+            break;
+        }
+        else if (!selectedNumbers.has(num - 1) && num - 1 >= 1) {
+            selectedNumbers.add(num - 1);
+            consecutiveAdded = true;
+            break;
+        }
+    }
+    if (!consecutiveAdded) {
+        for (let i = 1; i <= maxNumber; i++) {
+            if (!selectedNumbers.has(i)) {
+                selectedNumbers.add(i);
+                break;
+            }
+        }
+    }
+    // 4. Smart Fill (remaining 2 numbers)
+    while (selectedNumbers.size < 6) {
+        let currentSum = Array.from(selectedNumbers).reduce((a, b) => a + b, 0);
+        let evenCount = Array.from(selectedNumbers).filter((n) => n % 2 === 0).length;
+        let oddCount = selectedNumbers.size - evenCount;
+        let bestNum = -1;
+        let bestScore = -Infinity;
+        for (let num = 1; num <= maxNumber; num++) {
+            if (selectedNumbers.has(num))
+                continue;
+            let score = 0;
+            // Prefer moving sum towards targetSum
+            const newSum = currentSum + num;
+            const sumDiff = Math.abs(targetSum - (newSum + (maxNumber / 2) * (5 - selectedNumbers.size)));
+            score -= sumDiff * 0.5; // Penalize deviation
+            // Balance Even/Odd
+            const isEven = num % 2 === 0;
+            if (isEven && evenCount < 3)
+                score += 10;
+            if (!isEven && oddCount < 3)
+                score += 10;
+            // Add a bit of randomness or frequency weight to break ties
+            score += (freqMap.get(num) || 0) * 0.1;
+            if (score > bestScore) {
+                bestScore = score;
+                bestNum = num;
+            }
+        }
+        if (bestNum !== -1) {
+            selectedNumbers.add(bestNum);
+        }
+        else {
+            for (let i = 1; i <= maxNumber; i++) {
+                if (!selectedNumbers.has(i)) {
+                    selectedNumbers.add(i);
+                    break;
+                }
+            }
+        }
+    }
+    const finalNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
+    const sum = finalNumbers.reduce((a, b) => a + b, 0);
+    const evenCount = finalNumbers.filter((n) => n % 2 === 0).length;
+    const oddCount = 6 - evenCount;
+    let bonusNumber = undefined;
+    if (type === '6/55') {
+        // We pick the 3rd hot number that isn't in selected for the Jackpot 2 bonus number
+        for (const [num] of sortedByFreq) {
+            if (!selectedNumbers.has(num)) {
+                bonusNumber = num;
+                break;
+            }
+        }
+    }
+    return {
+        numbers: finalNumbers,
+        bonusNumber,
+        stats: {
+            evenCount,
+            oddCount,
+            sum,
+        },
+        reasoning: `Mix 2 Hot / 1 Gan / Cặp Tiến. Tổng ${sum}, Chẵn/Lẻ (${evenCount}/${oddCount})`,
     };
 }

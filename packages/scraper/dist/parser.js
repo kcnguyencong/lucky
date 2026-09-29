@@ -106,17 +106,44 @@ class DrawParser {
         for (let i = 0; i < totalDraws; i++) {
             const drawDate = new Date(baseDate.valueOf() - i * 24 * 60 * 60 * 1000);
             const dateKey = drawDate.toISOString().substring(0, 10).replace(/-/g, '');
-            const drawId = `MB-${dateKey}`;
+            let drawId = `MB-${dateKey}`;
+            if (lotteryType === 'MEGA_645')
+                drawId = `M645-${dateKey}`;
+            if (lotteryType === 'POWER_655')
+                drawId = `P655-${dateKey}`;
             const numbers = [];
-            for (let k = 0; k < 27; k++) {
-                numbers.push(Math.floor(Math.random() * 100));
+            let bonusNumber = undefined;
+            if (lotteryType === 'MEGA_645') {
+                while (numbers.length < 6) {
+                    const num = Math.floor(Math.random() * 45) + 1;
+                    if (!numbers.includes(num))
+                        numbers.push(num);
+                }
+            }
+            else if (lotteryType === 'POWER_655') {
+                while (numbers.length < 6) {
+                    const num = Math.floor(Math.random() * 55) + 1;
+                    if (!numbers.includes(num))
+                        numbers.push(num);
+                }
+                let b = Math.floor(Math.random() * 55) + 1;
+                while (numbers.includes(b))
+                    b = Math.floor(Math.random() * 55) + 1;
+                bonusNumber = b;
+            }
+            else {
+                // XSMB Default
+                for (let k = 0; k < 27; k++) {
+                    numbers.push(Math.floor(Math.random() * 100));
+                }
+                bonusNumber = numbers[0];
             }
             mockResults.push({
                 drawId,
                 lotteryType,
                 drawDate: drawDate.toISOString(),
-                numbers: numbers,
-                bonusNumber: numbers[0],
+                numbers: numbers.sort((a, b) => a - b),
+                bonusNumber,
             });
         }
         return mockResults;

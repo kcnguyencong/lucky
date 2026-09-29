@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { KPICards } from '@/components/KPICards';
-import { NumberGridHeatmap } from '@/components/NumberGridHeatmap';
+import { VietlottCards } from '@/components/VietlottCards';
 import { DrawHistoryTable } from '@/components/DrawHistoryTable';
 import { RefreshCw, BarChart2 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<any>(null);
-  const [freqStats, setFreqStats] = useState<any[]>([]);
+  const [vietlott, setVietlott] = useState<any>(null);
   const [draws, setDraws] = useState<any[]>([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -27,14 +27,14 @@ export default function DashboardPage() {
       const queryParams = forceRefresh ? '?refresh=true' : '';
       const drawsParams = forceRefresh ? `&refresh=true` : '';
 
-      const [sumRes, freqRes, drawsRes] = await Promise.all([
+      const [sumRes, vietlottRes, drawsRes] = await Promise.all([
         fetch(`${API_BASE}/summary${queryParams}`).then((res) => res.json()),
-        fetch(`${API_BASE}/stats/frequency${queryParams}`).then((res) => res.json()),
+        fetch(`${API_BASE}/predictions/vietlott${queryParams}`).then((res) => res.json()),
         fetch(`${API_BASE}/draws?page=${page}&limit=12${drawsParams}`).then((res) => res.json()),
       ]);
 
       if (sumRes.success) setSummary(sumRes.data);
-      if (freqRes.success) setFreqStats(freqRes.data);
+      if (vietlottRes.success) setVietlott(vietlottRes.data);
       
       if (drawsRes.success) {
         setDraws(drawsRes.data);
@@ -96,8 +96,8 @@ export default function DashboardPage() {
         {/* Executive KPI Summary */}
         <KPICards summary={summary} />
 
-        {/* Heatmap Section */}
-        <NumberGridHeatmap stats={freqStats} />
+        {/* Vietlott Section */}
+        {vietlott && <VietlottCards data={vietlott} />}
 
         {/* Historical Data Table */}
         <DrawHistoryTable
