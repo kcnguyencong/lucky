@@ -788,14 +788,15 @@ export interface VietlottPredictionTicket {
  */
 export function predictVietlott(
   draws: DrawRecord[],
-  type: '6/35' | '6/45' | '6/55'
+  type: '5/35' | '6/45' | '6/55'
 ): VietlottPredictionTicket {
-  const maxNumber = type === '6/35' ? 35 : type === '6/45' ? 45 : 55;
-  const targetSum = type === '6/35' ? 108 : type === '6/45' ? 138 : 168; // Ideal bell curve center
+  const maxNumber = type === '5/35' ? 35 : type === '6/45' ? 45 : 55;
+  const numBalls = type === '5/35' ? 5 : 6;
+  const targetSum = type === '5/35' ? 90 : type === '6/45' ? 138 : 168; // Ideal bell curve center
 
   if (draws.length === 0) {
     const fallbackSet = new Set<number>();
-    while (fallbackSet.size < 6) {
+    while (fallbackSet.size < numBalls) {
       fallbackSet.add(Math.floor(Math.random() * maxNumber) + 1);
     }
     const fallbackNums = Array.from(fallbackSet).sort((a, b) => a - b);
@@ -803,7 +804,8 @@ export function predictVietlott(
     const evenCount = fallbackNums.filter((n) => n % 2 === 0).length;
     return {
       numbers: fallbackNums,
-      stats: { evenCount, oddCount: 6 - evenCount, sum },
+      bonusNumber: type === '5/35' ? Math.floor(Math.random() * 12) + 1 : (type === '6/55' ? Math.floor(Math.random() * 55) + 1 : undefined),
+      stats: { evenCount, oddCount: numBalls - evenCount, sum },
       reasoning: 'Dự đoán ngẫu nhiên (Thiếu dữ liệu lịch sử)',
     };
   }
@@ -894,8 +896,8 @@ export function predictVietlott(
     }
   }
 
-  // 4. Smart Fill (remaining 2 numbers)
-  while (selectedNumbers.size < 6) {
+  // 4. Smart Fill (remaining numbers)
+  while (selectedNumbers.size < numBalls) {
     let currentSum = Array.from(selectedNumbers).reduce((a, b) => a + b, 0);
     let evenCount = Array.from(selectedNumbers).filter((n) => n % 2 === 0).length;
     let oddCount = selectedNumbers.size - evenCount;
@@ -909,13 +911,14 @@ export function predictVietlott(
       let score = 0;
       // Prefer moving sum towards targetSum
       const newSum = currentSum + num;
-      const sumDiff = Math.abs(targetSum - (newSum + (maxNumber / 2) * (5 - selectedNumbers.size))); 
+      const sumDiff = Math.abs(targetSum - (newSum + (maxNumber / 2) * (numBalls - 1 - selectedNumbers.size))); 
       score -= sumDiff * 0.5; // Penalize deviation
 
       // Balance Even/Odd
       const isEven = num % 2 === 0;
-      if (isEven && evenCount < 3) score += 10;
-      if (!isEven && oddCount < 3) score += 10;
+      const targetEven = Math.floor(numBalls / 2);
+      if (isEven && evenCount < targetEven + 1) score += 10;
+      if (!isEven && oddCount < targetEven + 1) score += 10;
 
       // Add a bit of randomness or frequency weight to break ties
       score += (freqMap.get(num) || 0) * 0.1;
@@ -942,23 +945,20 @@ export function predictVietlott(
   const finalNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
   const sum = finalNumbers.reduce((a, b) => a + b, 0);
   const evenCount = finalNumbers.filter((n) => n % 2 === 0).length;
-  const oddCount = 6 - evenCount;
+  const oddCount = numBalls - evenCount;
 
   let bonusNumber: number | undefined = undefined;
-  if (type === '6/35') {
+  if (type === '5/35') {
+    // 5/35 has a bonus number from 1-12. Randomly choose for now based on frequency logic if available.
+    // However, the main freq map is 1-35. We just pick a random 1-12 to be safe.
+    bonusNumber = Math.floor(Math.random() * 12) + 1;
+  } else if (type === '6/55') {
+    // We pick the 3rd hot number that isn't in selected for the Jackpot 2 bonus number
     for (const [num] of sortedByFreq) {
       if (!selectedNumbers.has(num)) {
         bonusNumber = num;
         break;
       }
-    }
-    // If fallback was used, random pick
-    if (!bonusNumber && draws.length === 0) {
-      let b;
-      do {
-        b = Math.floor(Math.random() * maxNumber) + 1;
-      } while (selectedNumbers.has(b));
-      bonusNumber = b;
     }
   }
 

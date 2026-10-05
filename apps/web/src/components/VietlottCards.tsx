@@ -14,14 +14,14 @@ interface VietlottPredictionTicket {
 
 interface VietlottCardsProps {
   data: {
-    max635?: VietlottPredictionTicket;
+    vietlott535?: VietlottPredictionTicket;
     mega645: VietlottPredictionTicket;
     power655: VietlottPredictionTicket;
   };
 }
 
 export function VietlottCards({ data }: VietlottCardsProps) {
-  const { max635, mega645, power655 } = data;
+  const { vietlott535, mega645, power655 } = data;
 
   const renderBall = (num: number, isBonus = false) => {
     return (
@@ -42,8 +42,8 @@ export function VietlottCards({ data }: VietlottCardsProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-      {/* Max 6/35 Card */}
-      {max635 && (
+      {/* 5/35 Card */}
+      {vietlott535 && (
         <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-100 transition-opacity">
             <Target className="w-12 h-12 text-cyan-500" />
@@ -54,28 +54,28 @@ export function VietlottCards({ data }: VietlottCardsProps) {
               <Target className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white tracking-wide">Tự chọn 6/35</h3>
-              <p className="text-xs text-slate-400">Dự đoán kỳ tới</p>
+              <h3 className="text-xl font-bold text-white tracking-wide">Vietlott 5/35</h3>
+              <p className="text-xs text-slate-400">Dự đoán kỳ tới (Kèm số đặc biệt)</p>
             </div>
           </div>
 
             <div className="flex flex-wrap items-center gap-3 mb-6">
-            {max635.numbers.map((n) => renderBall(n))}
+            {vietlott535.numbers.map((n) => renderBall(n))}
             <div className="w-px h-8 bg-slate-700 mx-1"></div>
-            {max635.bonusNumber && renderBall(max635.bonusNumber, true)}
+            {vietlott535.bonusNumber && renderBall(vietlott535.bonusNumber, true)}
           </div>
 
           <div className="bg-slate-800/50 rounded-xl p-4 text-sm border border-slate-700/50">
             <div className="flex justify-between items-center mb-2">
               <span className="text-slate-400">Chẵn / Lẻ:</span>
-              <span className="font-mono text-emerald-400">{max635.stats.evenCount} / {max635.stats.oddCount}</span>
+              <span className="font-mono text-emerald-400">{vietlott535.stats.evenCount} / {vietlott535.stats.oddCount}</span>
             </div>
             <div className="flex justify-between items-center mb-3">
               <span className="text-slate-400">Tổng điểm:</span>
-              <span className="font-mono text-amber-400">{max635.stats.sum}</span>
+              <span className="font-mono text-amber-400">{vietlott535.stats.sum}</span>
             </div>
             <div className="text-xs text-slate-300 italic border-t border-slate-700/50 pt-2">
-              💡 {max635.reasoning}
+              💡 {vietlott535.reasoning}
             </div>
           </div>
         </div>
@@ -128,12 +128,14 @@ export function VietlottCards({ data }: VietlottCardsProps) {
           </div>
           <div>
             <h3 className="text-xl font-bold text-white tracking-wide">Power 6/55</h3>
-            <p className="text-xs text-slate-400">Dự đoán kỳ tới</p>
+            <p className="text-xs text-slate-400">Dự đoán kỳ tới (Kèm Jackpot 2)</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           {power655.numbers.map((n) => renderBall(n))}
+          <div className="w-px h-8 bg-slate-700 mx-1"></div>
+          {power655.bonusNumber && renderBall(power655.bonusNumber, true)}
         </div>
 
         <div className="bg-slate-800/50 rounded-xl p-4 text-sm border border-slate-700/50">
