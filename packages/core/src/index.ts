@@ -794,10 +794,17 @@ export function predictVietlott(
   const targetSum = type === '6/35' ? 108 : type === '6/45' ? 138 : 168; // Ideal bell curve center
 
   if (draws.length === 0) {
+    const fallbackSet = new Set<number>();
+    while (fallbackSet.size < 6) {
+      fallbackSet.add(Math.floor(Math.random() * maxNumber) + 1);
+    }
+    const fallbackNums = Array.from(fallbackSet).sort((a, b) => a - b);
+    const sum = fallbackNums.reduce((a, b) => a + b, 0);
+    const evenCount = fallbackNums.filter((n) => n % 2 === 0).length;
     return {
-      numbers: [1, 2, 3, 4, 5, 6],
-      stats: { evenCount: 3, oddCount: 3, sum: 21 },
-      reasoning: 'Fallback',
+      numbers: fallbackNums,
+      stats: { evenCount, oddCount: 6 - evenCount, sum },
+      reasoning: 'Dự đoán ngẫu nhiên (Thiếu dữ liệu lịch sử)',
     };
   }
 
