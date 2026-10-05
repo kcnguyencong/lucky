@@ -834,17 +834,31 @@ export function predictVietlott(
 
   const selectedNumbers = new Set<number>();
 
-  // 1. Pick 2 Hot
+  // 1. Pick 2 Hot (randomly from top 6)
   let hotCount = 0;
-  for (const [num] of sortedByFreq) {
+  const topHot = sortedByFreq.slice(0, 6);
+  // Shuffle topHot
+  for (let i = topHot.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [topHot[i], topHot[j]] = [topHot[j], topHot[i]];
+  }
+
+  for (const [num] of topHot) {
     if (hotCount < 2 && !selectedNumbers.has(num)) {
       selectedNumbers.add(num);
       hotCount++;
     }
   }
 
-  // 2. Pick 1 Cold
-  for (const [num] of sortedByGap) {
+  // 2. Pick 1 Cold (randomly from top 4 coldest)
+  const topCold = sortedByGap.slice(0, 4);
+  // Shuffle topCold
+  for (let i = topCold.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [topCold[i], topCold[j]] = [topCold[j], topCold[i]];
+  }
+
+  for (const [num] of topCold) {
     if (!selectedNumbers.has(num)) {
       selectedNumbers.add(num);
       break;
@@ -898,6 +912,7 @@ export function predictVietlott(
 
       // Add a bit of randomness or frequency weight to break ties
       score += (freqMap.get(num) || 0) * 0.1;
+      score += Math.random() * 5; // Introduce randomness for diverse tickets
 
       if (score > bestScore) {
         bestScore = score;
