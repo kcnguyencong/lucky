@@ -59,8 +59,10 @@ export function VietlottCards({ data }: VietlottCardsProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
             {max635.numbers.map((n) => renderBall(n))}
+            <div className="w-px h-8 bg-slate-700 mx-1"></div>
+            {max635.bonusNumber && renderBall(max635.bonusNumber, true)}
           </div>
 
           <div className="bg-slate-800/50 rounded-xl p-4 text-sm border border-slate-700/50">
@@ -126,14 +128,12 @@ export function VietlottCards({ data }: VietlottCardsProps) {
           </div>
           <div>
             <h3 className="text-xl font-bold text-white tracking-wide">Power 6/55</h3>
-            <p className="text-xs text-slate-400">Dự đoán kỳ tới (Kèm Jackpot 2)</p>
+            <p className="text-xs text-slate-400">Dự đoán kỳ tới</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex flex-wrap gap-3 mb-6">
           {power655.numbers.map((n) => renderBall(n))}
-          <div className="w-px h-8 bg-slate-700 mx-1"></div>
-          {power655.bonusNumber && renderBall(power655.bonusNumber, true)}
         </div>
 
         <div className="bg-slate-800/50 rounded-xl p-4 text-sm border border-slate-700/50">

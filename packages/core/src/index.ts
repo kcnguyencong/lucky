@@ -945,13 +945,20 @@ export function predictVietlott(
   const oddCount = 6 - evenCount;
 
   let bonusNumber: number | undefined = undefined;
-  if (type === '6/55') {
-    // We pick the 3rd hot number that isn't in selected for the Jackpot 2 bonus number
+  if (type === '6/35') {
     for (const [num] of sortedByFreq) {
       if (!selectedNumbers.has(num)) {
         bonusNumber = num;
         break;
       }
+    }
+    // If fallback was used, random pick
+    if (!bonusNumber && draws.length === 0) {
+      let b;
+      do {
+        b = Math.floor(Math.random() * maxNumber) + 1;
+      } while (selectedNumbers.has(b));
+      bonusNumber = b;
     }
   }
 
