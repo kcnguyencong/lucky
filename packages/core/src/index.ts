@@ -788,10 +788,10 @@ export interface VietlottPredictionTicket {
  */
 export function predictVietlott(
   draws: DrawRecord[],
-  type: '6/45' | '6/55'
+  type: '6/35' | '6/45' | '6/55'
 ): VietlottPredictionTicket {
-  const maxNumber = type === '6/45' ? 45 : 55;
-  const targetSum = type === '6/45' ? 138 : 168; // Ideal bell curve center
+  const maxNumber = type === '6/35' ? 35 : type === '6/45' ? 45 : 55;
+  const targetSum = type === '6/35' ? 108 : type === '6/45' ? 138 : 168; // Ideal bell curve center
 
   if (draws.length === 0) {
     return {
