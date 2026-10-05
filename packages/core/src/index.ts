@@ -804,7 +804,7 @@ export function predictVietlott(
     const evenCount = fallbackNums.filter((n) => n % 2 === 0).length;
     return {
       numbers: fallbackNums,
-      bonusNumber: type === '5/35' ? Math.floor(Math.random() * 12) + 1 : (type === '6/55' ? Math.floor(Math.random() * 55) + 1 : undefined),
+      bonusNumber: type === '5/35' ? Math.floor(Math.random() * 12) + 1 : undefined,
       stats: { evenCount, oddCount: numBalls - evenCount, sum },
       reasoning: 'Dự đoán ngẫu nhiên (Thiếu dữ liệu lịch sử)',
     };
@@ -952,14 +952,6 @@ export function predictVietlott(
     // 5/35 has a bonus number from 1-12. Randomly choose for now based on frequency logic if available.
     // However, the main freq map is 1-35. We just pick a random 1-12 to be safe.
     bonusNumber = Math.floor(Math.random() * 12) + 1;
-  } else if (type === '6/55') {
-    // We pick the 3rd hot number that isn't in selected for the Jackpot 2 bonus number
-    for (const [num] of sortedByFreq) {
-      if (!selectedNumbers.has(num)) {
-        bonusNumber = num;
-        break;
-      }
-    }
   }
 
   return {
