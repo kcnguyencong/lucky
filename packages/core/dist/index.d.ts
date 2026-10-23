@@ -37,14 +37,15 @@ export declare function calculateGapStats(draws: DrawRecord[], maxNumber?: numbe
  */
 export declare function calculateTopPairs(draws: DrawRecord[], topN?: number): PairStat[];
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v7 (Trend Following & Cluster Model).
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v8 (Synergy Song Thủ & Realistic Rhythm).
  *
- * Design Rationale:
- * - Shift away from "Max Gap Rebound" (Lô Gan) as it proved too risky.
- * - Multi-Factor Scoring Architecture:
- *   1. Cluster Model & Lô Rơi (Max 40 pts): Rewards numbers that appeared recently (gap 0, 1, 2) and heavily penalizes Lô Gan (gap > 12).
- *   2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts): Rewards numbers belonging to currently hot Heads/Tails, or Heads/Tails that were missing in the previous draw (Cầu Đầu Câm).
- *   3. Short-Term Transition Matrix (Max 25 pts): Analyzes only the last 100 draws for short-term Bạc Nhớ trends.
+ * Design Improvements:
+ * 1. Realistic Gap Distribution: Reduces the heavy bias on Lô Rơi (gap 0, which only accounts for ~20% of draws).
+ *    Prioritizes sweet-spot gaps (2-4 days) that statistically represent the peak breakout zone in XSMB.
+ * 2. Head/Tail Momentum & Câm: Balanced bonus for missing heads/tails and recent active clusters.
+ * 3. Short-Term Bạc Nhớ (100 draws): Directional transition matrix.
+ * 4. Pair Synergy & Inversion (Cầu Song Thủ Lộn & Đồng Quy): The 2nd pick is paired with the 1st pick using
+ *    inverted pairs (e.g., 27-72) and co-occurrence frequency to maximize hit probability.
  */
 export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, maxNumber?: number): Array<{
     number: number;
@@ -118,6 +119,8 @@ export declare function generateOverviewSummary(draws: DrawRecord[]): OverviewSu
 export interface VietlottPredictionTicket {
     numbers: number[];
     bonusNumber?: number;
+    strategy?: 'balanced' | 'hot' | 'cold';
+    strategyName?: string;
     stats: {
         evenCount: number;
         oddCount: number;
@@ -125,7 +128,16 @@ export interface VietlottPredictionTicket {
     };
     reasoning: string;
 }
+export type VietlottStrategy = 'balanced' | 'hot' | 'cold';
 /**
- * Predicts a set of 6 numbers for Vietlott Mega 6/45 or Power 6/55.
+ * Predicts a set of numbers for Vietlott 5/35, Mega 6/45, or Power 6/55 with multi-strategy support.
  */
-export declare function predictVietlott(draws: DrawRecord[], type: '6/45' | '6/55'): VietlottPredictionTicket;
+export declare function predictVietlott(draws: DrawRecord[], type: '5/35' | '6/45' | '6/55', strategy?: VietlottStrategy): VietlottPredictionTicket;
+/**
+ * Predicts all 3 strategies (Balanced, Hot, Cold) for a given Vietlott game.
+ */
+export declare function predictVietlottTickets(draws: DrawRecord[], type: '5/35' | '6/45' | '6/55'): {
+    balanced: VietlottPredictionTicket;
+    hot: VietlottPredictionTicket;
+    cold: VietlottPredictionTicket;
+};

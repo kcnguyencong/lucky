@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { predictVietlott } from '@lottery/core';
+import { predictVietlottTickets } from '@lottery/core';
 import { getMergedDraws } from '@/lib/liveScraper';
 
 export const dynamic = 'force-dynamic';
@@ -17,16 +17,25 @@ export async function GET(request: NextRequest) {
     const drawsMega = allDraws.filter(d => d.lotteryType === 'MEGA_645');
     const drawsPower = allDraws.filter(d => d.lotteryType === 'POWER_655');
 
-    const prediction535 = predictVietlott(draws535, '5/35');
-    const megaPrediction = predictVietlott(drawsMega, '6/45');
-    const powerPrediction = predictVietlott(drawsPower, '6/55');
+    const tickets535 = predictVietlottTickets(draws535, '5/35');
+    const ticketsMega = predictVietlottTickets(drawsMega, '6/45');
+    const ticketsPower = predictVietlottTickets(drawsPower, '6/55');
 
     return NextResponse.json({
       success: true,
       data: {
-        vietlott535: prediction535,
-        mega645: megaPrediction,
-        power655: powerPrediction,
+        vietlott535: {
+          ...tickets535.balanced,
+          strategies: tickets535,
+        },
+        mega645: {
+          ...ticketsMega.balanced,
+          strategies: ticketsMega,
+        },
+        power655: {
+          ...ticketsPower.balanced,
+          strategies: ticketsPower,
+        },
       }
     });
   } catch (error: any) {

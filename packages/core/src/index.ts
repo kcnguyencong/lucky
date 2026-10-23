@@ -142,14 +142,15 @@ export function calculateTopPairs(draws: DrawRecord[], topN: number = 10): PairS
 }
 
 /**
- * Predicts top N numbers most likely to appear in the next draw — Algorithm v7 (Trend Following & Cluster Model).
+ * Predicts top N numbers most likely to appear in the next draw — Algorithm v8 (Synergy Song Thủ & Realistic Rhythm).
  *
- * Design Rationale:
- * - Shift away from "Max Gap Rebound" (Lô Gan) as it proved too risky.
- * - Multi-Factor Scoring Architecture:
- *   1. Cluster Model & Lô Rơi (Max 40 pts): Rewards numbers that appeared recently (gap 0, 1, 2) and heavily penalizes Lô Gan (gap > 12).
- *   2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts): Rewards numbers belonging to currently hot Heads/Tails, or Heads/Tails that were missing in the previous draw (Cầu Đầu Câm).
- *   3. Short-Term Transition Matrix (Max 25 pts): Analyzes only the last 100 draws for short-term Bạc Nhớ trends.
+ * Design Improvements:
+ * 1. Realistic Gap Distribution: Reduces the heavy bias on Lô Rơi (gap 0, which only accounts for ~20% of draws).
+ *    Prioritizes sweet-spot gaps (2-4 days) that statistically represent the peak breakout zone in XSMB.
+ * 2. Head/Tail Momentum & Câm: Balanced bonus for missing heads/tails and recent active clusters.
+ * 3. Short-Term Bạc Nhớ (100 draws): Directional transition matrix.
+ * 4. Pair Synergy & Inversion (Cầu Song Thủ Lộn & Đồng Quy): The 2nd pick is paired with the 1st pick using
+ *    inverted pairs (e.g., 27-72) and co-occurrence frequency to maximize hit probability.
  */
 export function predictTopNumbers(
   draws: DrawRecord[],
@@ -165,9 +166,9 @@ export function predictTopNumbers(
   const sortedAsc = [...sortedDesc].reverse();
   const latestDrawNums = new Set(sortedDesc[0].numbers);
 
-  // 1. Cluster Model & Lô Rơi (Max 40 pts) & Phạt Lô Gan (-50 pts)
+  // 1. Cluster & Realistic Gap Rhythm (Max 30 pts)
   const currentGapMap = new Map<number, number>();
-  const clusterScores = new Map<number, number>();
+  const gapScores = new Map<number, number>();
 
   for (let num = 0; num <= maxNumber; num++) {
     let curGap = 0;
@@ -178,40 +179,44 @@ export function predictTopNumbers(
     currentGapMap.set(num, curGap);
 
     let score = 0;
-    if (curGap > 12) {
-      score = -50; // Phạt nặng Lô Gan
-    } else if (curGap === 0) {
-      score = 40; // Lô rơi từ kỳ trước
+    if (curGap > 13) {
+      score = -40; // Phạt nặng Lô Gan rủi ro cao
+    } else if (curGap === 2 || curGap === 3) {
+      score = 30; // Điểm rơi chu kỳ vàng của XSMB (nhịp cách 2-3 ngày)
     } else if (curGap === 1) {
-      score = 30; // Nhịp cách 1 ngày
-    } else if (curGap === 2) {
-      score = 20; // Nhịp cách 2 ngày
-    } else if (curGap <= 5) {
-      score = 10; // Đang trong vùng an toàn
+      score = 25; // Nhịp cách 1 ngày
+    } else if (curGap === 4 || curGap === 5) {
+      score = 20; // Nhịp an toàn
+    } else if (curGap === 0) {
+      score = 16; // Lô rơi kỳ trước (giữ tỷ trọng chuẩn ~18-20%)
+    } else if (curGap <= 8) {
+      score = 12; // Nhịp trung bình
+    } else {
+      score = 4; // Nhịp dài
     }
-    clusterScores.set(num, score);
+    gapScores.set(num, score);
   }
 
-  // 2. Head/Tail Momentum & Đầu/Đuôi Câm (Max 35 pts)
+  // 2. Head/Tail Momentum & Câm (Max 25 pts)
   const headFreq = new Array(10).fill(0);
   const tailFreq = new Array(10).fill(0);
   const shortWindow = Math.min(7, sortedDesc.length);
-  
+
   for (let i = 0; i < shortWindow; i++) {
     const nums = new Set(sortedDesc[i].numbers);
-    nums.forEach(num => {
+    nums.forEach((num) => {
       headFreq[Math.floor(num / 10)]++;
       tailFreq[num % 10]++;
     });
   }
-  
+
   const maxHeadFreq = Math.max(...headFreq, 1);
   const maxTailFreq = Math.max(...tailFreq, 1);
 
   // Đầu câm / Đuôi câm ở kỳ quay MỚI NHẤT
   const latestHeadFreq = new Array(10).fill(0);
   const latestTailFreq = new Array(10).fill(0);
-  latestDrawNums.forEach(num => {
+  latestDrawNums.forEach((num) => {
     latestHeadFreq[Math.floor(num / 10)]++;
     latestTailFreq[num % 10]++;
   });
@@ -227,27 +232,47 @@ export function predictTopNumbers(
   for (let num = 0; num <= maxNumber; num++) {
     const head = Math.floor(num / 10);
     const tail = num % 10;
-    
-    let score = ((headFreq[head] / maxHeadFreq) * 10) + ((tailFreq[tail] / maxTailFreq) * 10);
-    
-    // Thưởng Đầu/Đuôi câm
-    if (missingHeads.has(head)) score += 15;
-    if (missingTails.has(tail)) score += 15;
-    
-    momentumScores.set(num, Math.min(score, 35)); // Cap at 35
+
+    let score = ((headFreq[head] / maxHeadFreq) * 7.5) + ((tailFreq[tail] / maxTailFreq) * 7.5);
+
+    // Thưởng Đầu/Đuôi câm vừa phải (+10)
+    if (missingHeads.has(head)) score += 10;
+    if (missingTails.has(tail)) score += 10;
+
+    momentumScores.set(num, Math.min(score, 25));
   }
 
-  // 3. Short-Term Transition Matrix (Last 100 draws, max 25 pts)
+  // 3. Tần suất phong độ 30 kỳ gần nhất (Max 20 pts)
+  const freq30Map = new Map<number, number>();
+  const window30 = Math.min(30, sortedDesc.length);
+  for (let i = 0; i < window30; i++) {
+    const nums = new Set(sortedDesc[i].numbers);
+    nums.forEach((num) => {
+      freq30Map.set(num, (freq30Map.get(num) || 0) + 1);
+    });
+  }
+  let maxFreq30 = 1;
+  for (let num = 0; num <= maxNumber; num++) {
+    const f = freq30Map.get(num) || 0;
+    if (f > maxFreq30) maxFreq30 = f;
+  }
+  const freqScores = new Map<number, number>();
+  for (let num = 0; num <= maxNumber; num++) {
+    const f = freq30Map.get(num) || 0;
+    freqScores.set(num, (f / maxFreq30) * 20);
+  }
+
+  // 4. Bạc Nhớ Transition Matrix (100 draws, Max 25 pts)
   const transitionMatrix = new Map<string, number>();
   const transitionWindow = Math.min(100, sortedAsc.length);
   const recentAsc = sortedAsc.slice(sortedAsc.length - transitionWindow);
-  
+
   for (let i = 0; i < recentAsc.length - 1; i++) {
     const todayNums = new Set(recentAsc[i].numbers);
     const tmrNums = new Set(recentAsc[i + 1].numbers);
-    
-    todayNums.forEach(prev => {
-      tmrNums.forEach(next => {
+
+    todayNums.forEach((prev) => {
+      tmrNums.forEach((next) => {
         const key = `${prev}-${next}`;
         transitionMatrix.set(key, (transitionMatrix.get(key) || 0) + 1);
       });
@@ -258,50 +283,136 @@ export function predictTopNumbers(
   let maxBacNho = 1;
   for (let num = 0; num <= maxNumber; num++) {
     let score = 0;
-    latestDrawNums.forEach(prev => {
+    latestDrawNums.forEach((prev) => {
       score += transitionMatrix.get(`${prev}-${num}`) || 0;
     });
     bacNhoScores.set(num, score);
     if (score > maxBacNho) maxBacNho = score;
   }
 
-  // 4. Combine Scores
-  const scores = Array.from({ length: maxNumber + 1 }, (_, num) => {
-    const clusterScore = clusterScores.get(num)!;
+  // 5. Co-occurrence matrix for pair synergy (150 draws)
+  const coOccurMap = new Map<string, number>();
+  const coOccurWindow = Math.min(150, sortedDesc.length);
+  for (let i = 0; i < coOccurWindow; i++) {
+    const nums = Array.from(new Set(sortedDesc[i].numbers));
+    for (let j = 0; j < nums.length; j++) {
+      for (let k = j + 1; k < nums.length; k++) {
+        const a = Math.min(nums[j], nums[k]);
+        const b = Math.max(nums[j], nums[k]);
+        const key = `${a}-${b}`;
+        coOccurMap.set(key, (coOccurMap.get(key) || 0) + 1);
+      }
+    }
+  }
+
+  // Calculate Base Scores for all numbers
+  const baseScores = Array.from({ length: maxNumber + 1 }, (_, num) => {
+    const gScore = gapScores.get(num)!;
     const mScore = momentumScores.get(num)!;
+    const fScore = freqScores.get(num)!;
     const bScore = (bacNhoScores.get(num)! / maxBacNho) * 25;
 
-    const totalScore = Number((clusterScore + mScore + bScore).toFixed(1));
+    const totalScore = Number((gScore + mScore + fScore + bScore).toFixed(1));
     const curG = currentGapMap.get(num)!;
     const head = Math.floor(num / 10);
     const tail = num % 10;
 
-    let reasoning = `Phong độ ổn định`;
-    
-    if (curG > 12) {
+    let reasoning = 'Phong độ ổn định';
+    if (curG > 13) {
       reasoning = `Lô Gan rủi ro cao (Vắng ${curG} kỳ)`;
-    } else if (missingHeads.has(head) || missingTails.has(tail)) {
-      if (missingHeads.has(head) && missingTails.has(tail)) {
-         reasoning = `💥 Cầu báo Kép Câm: Đầu ${head} & Đuôi ${tail} cùng câm`;
-      } else if (missingHeads.has(head)) {
-         reasoning = `🔥 Cầu Đầu Câm: Bắt lại Đầu ${head} (Câm kỳ trước)`;
-      } else {
-         reasoning = `🔥 Cầu Đuôi Câm: Bắt lại Đuôi ${tail} (Câm kỳ trước)`;
-      }
-    } else if (clusterScore === 40) {
-      reasoning = `♻️ Bắt Lô rơi kỳ trước`;
-    } else if (bScore >= 18) {
-      reasoning = `Bạc nhớ ngắn hạn (100 kỳ): Dễ nổ sau bộ số hôm qua`;
+    } else if (missingHeads.has(head) && missingTails.has(tail)) {
+      reasoning = `💥 Kép Câm: Đầu ${head} & Đuôi ${tail} cùng câm`;
+    } else if (missingHeads.has(head)) {
+      reasoning = `🔥 Cầu Đầu Câm: Bắt lại Đầu ${head}`;
+    } else if (missingTails.has(tail)) {
+      reasoning = `🔥 Cầu Đuôi Câm: Bắt lại Đuôi ${tail}`;
+    } else if (curG === 2 || curG === 3) {
+      reasoning = `🎯 Điểm rơi chu kỳ vàng (${curG} ngày chưa nổ)`;
     } else if (curG === 1) {
       reasoning = `Nhịp nghỉ 1 ngày đẹp`;
-    } else if (mScore >= 20) {
-      reasoning = `Ăn theo sức mạnh Đầu/Đuôi đang về nhiều`;
+    } else if (curG === 0) {
+      reasoning = `♻️ Bắt Lô rơi kỳ trước`;
+    } else if (bScore >= 18) {
+      reasoning = `Bạc nhớ nổ cao sau bộ số hôm qua`;
+    } else if (fScore >= 15) {
+      reasoning = `Số đang giữ phong độ cực tốt (30 kỳ)`;
     }
 
     return { number: num, score: totalScore, reasoning };
   });
 
-  return scores.sort((a, b) => b.score - a.score).slice(0, topN);
+  // Sort by base score descending
+  baseScores.sort((a, b) => b.score - a.score);
+
+  if (topN <= 1 || baseScores.length <= 1) {
+    return baseScores.slice(0, topN);
+  }
+
+  // Pick 1: Primary anchor (Bạch thủ)
+  const primary = baseScores[0];
+  const primaryNum = primary.number;
+  const primaryHead = Math.floor(primaryNum / 10);
+  const primaryTail = primaryNum % 10;
+  const invertedNum = primaryTail * 10 + primaryHead;
+
+  // Pick 2: Find best companion for Song Thủ Lô (Inverted or highest co-occurrence)
+  let bestCompanionIndex = 1;
+  let bestCompanionScore = -Infinity;
+  let companionReason = '';
+
+  for (let i = 1; i < baseScores.length; i++) {
+    const candidate = baseScores[i];
+    const cNum = candidate.number;
+    const cGap = currentGapMap.get(cNum) || 0;
+
+    if (cGap > 13) continue; // Skip dangerous cold numbers
+
+    let synergyBonus = 0;
+    let reason = candidate.reasoning;
+
+    // Check Inverted Pair (Cầu lộn) - Golden tactic of Song Thủ
+    if (cNum === invertedNum && primaryHead !== primaryTail) {
+      synergyBonus += 18;
+      reason = `🔁 Song thủ lộn cùng ${String(primaryNum).padStart(2, '0')} (Cặp lộn tương hỗ)`;
+    }
+
+    // Check Co-occurrence frequency
+    const a = Math.min(primaryNum, cNum);
+    const b = Math.max(primaryNum, cNum);
+    const pairCount = coOccurMap.get(`${a}-${b}`) || 0;
+    if (pairCount >= 5) {
+      synergyBonus += Math.min(pairCount * 1.5, 15);
+      if (synergyBonus > 18 || cNum !== invertedNum) {
+        reason = `🤝 Cặp đồng quy cùng ${String(primaryNum).padStart(2, '0')} (${pairCount} lần về chung)`;
+      }
+    }
+
+    const totalEvaluatedScore = candidate.score + synergyBonus;
+    if (totalEvaluatedScore > bestCompanionScore) {
+      bestCompanionScore = totalEvaluatedScore;
+      bestCompanionIndex = i;
+      companionReason = reason;
+    }
+  }
+
+  const companion = {
+    ...baseScores[bestCompanionIndex],
+    score: Number(Math.max(baseScores[bestCompanionIndex].score, Number(bestCompanionScore.toFixed(1)))),
+    reasoning: companionReason || baseScores[bestCompanionIndex].reasoning,
+  };
+
+  const selected = [primary, companion];
+
+  // If topN > 2, add the remaining highest base score candidates
+  if (topN > 2) {
+    for (let i = 1; i < baseScores.length; i++) {
+      if (i !== bestCompanionIndex && selected.length < topN) {
+        selected.push(baseScores[i]);
+      }
+    }
+  }
+
+  return selected;
 }
 
 export interface SpecialPrizePrediction {
@@ -774,7 +885,9 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
 
 export interface VietlottPredictionTicket {
   numbers: number[];
-  bonusNumber?: number; // Only for 6/55
+  bonusNumber?: number;
+  strategy?: 'balanced' | 'hot' | 'cold';
+  strategyName?: string;
   stats: {
     evenCount: number;
     oddCount: number;
@@ -783,12 +896,15 @@ export interface VietlottPredictionTicket {
   reasoning: string;
 }
 
+export type VietlottStrategy = 'balanced' | 'hot' | 'cold';
+
 /**
- * Predicts a set of 6 numbers for Vietlott Mega 6/45 or Power 6/55.
+ * Predicts a set of numbers for Vietlott 5/35, Mega 6/45, or Power 6/55 with multi-strategy support.
  */
 export function predictVietlott(
   draws: DrawRecord[],
-  type: '5/35' | '6/45' | '6/55'
+  type: '5/35' | '6/45' | '6/55',
+  strategy: VietlottStrategy = 'balanced'
 ): VietlottPredictionTicket {
   const maxNumber = type === '5/35' ? 35 : type === '6/45' ? 45 : 55;
   const numBalls = type === '5/35' ? 5 : 6;
@@ -805,6 +921,8 @@ export function predictVietlott(
     return {
       numbers: fallbackNums,
       bonusNumber: type === '5/35' ? Math.floor(Math.random() * 12) + 1 : undefined,
+      strategy,
+      strategyName: strategy === 'hot' ? 'Phong Độ Hot' : strategy === 'cold' ? 'Săn Gan Đột Phá' : 'Cân Bằng Gauss',
       stats: { evenCount, oddCount: numBalls - evenCount, sum },
       reasoning: 'Dự đoán ngẫu nhiên (Thiếu dữ liệu lịch sử)',
     };
@@ -843,60 +961,77 @@ export function predictVietlott(
 
   const selectedNumbers = new Set<number>();
 
-  // 1. Pick 2 Hot (randomly from top 6)
-  let hotCount = 0;
-  const topHot = sortedByFreq.slice(0, 6);
-  // Shuffle topHot
-  for (let i = topHot.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [topHot[i], topHot[j]] = [topHot[j], topHot[i]];
-  }
-
-  for (const [num] of topHot) {
-    if (hotCount < 2 && !selectedNumbers.has(num)) {
-      selectedNumbers.add(num);
-      hotCount++;
+  if (strategy === 'hot') {
+    // Strategy HOT: Focus on the hottest numbers in the last 30 draws
+    const topHot = sortedByFreq.slice(0, 10);
+    // Shuffle slightly to allow ticket variety
+    const shuffledHot = [...topHot].sort(() => Math.random() - 0.5);
+    for (const [num] of shuffledHot) {
+      if (selectedNumbers.size < numBalls - 1) {
+        selectedNumbers.add(num);
+      }
     }
-  }
-
-  // 2. Pick 1 Cold (randomly from top 4 coldest)
-  const topCold = sortedByGap.slice(0, 4);
-  // Shuffle topCold
-  for (let i = topCold.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [topCold[i], topCold[j]] = [topCold[j], topCold[i]];
-  }
-
-  for (const [num] of topCold) {
-    if (!selectedNumbers.has(num)) {
-      selectedNumbers.add(num);
-      break;
+    // Add 1 number with gap 1 or 2
+    for (const [num, gap] of gapMap.entries()) {
+      if ((gap === 1 || gap === 2) && !selectedNumbers.has(num)) {
+        selectedNumbers.add(num);
+        break;
+      }
     }
-  }
+  } else if (strategy === 'cold') {
+    // Strategy COLD: Target numbers with gap between 7 and 16 (approaching rebound threshold)
+    const reboundCandidates = Array.from(gapMap.entries())
+      .filter(([_, gap]) => gap >= 7 && gap <= 16)
+      .sort((a, b) => b[1] - a[1]);
+    const shuffledRebound = [...reboundCandidates].sort(() => Math.random() - 0.5);
 
-  // 3. Add 1 consecutive
-  let consecutiveAdded = false;
-  for (const num of Array.from(selectedNumbers)) {
-    if (!selectedNumbers.has(num + 1) && num + 1 <= maxNumber) {
-      selectedNumbers.add(num + 1);
-      consecutiveAdded = true;
-      break;
-    } else if (!selectedNumbers.has(num - 1) && num - 1 >= 1) {
-      selectedNumbers.add(num - 1);
-      consecutiveAdded = true;
-      break;
+    for (const [num] of shuffledRebound) {
+      if (selectedNumbers.size < Math.min(3, numBalls - 2)) {
+        selectedNumbers.add(num);
+      }
     }
-  }
-  if (!consecutiveAdded) {
-    for (let i = 1; i <= maxNumber; i++) {
-      if (!selectedNumbers.has(i)) {
-        selectedNumbers.add(i);
+
+    // Balance with sweet-spot rhythm numbers (gap 2-3)
+    for (const [num, gap] of gapMap.entries()) {
+      if ((gap === 2 || gap === 3) && !selectedNumbers.has(num)) {
+        selectedNumbers.add(num);
+        if (selectedNumbers.size >= numBalls - 1) break;
+      }
+    }
+  } else {
+    // Strategy BALANCED (Default Gauss Bell Curve)
+    // 1. Pick 2 Hot (randomly from top 6)
+    let hotCount = 0;
+    const topHot = sortedByFreq.slice(0, 6).sort(() => Math.random() - 0.5);
+    for (const [num] of topHot) {
+      if (hotCount < 2 && !selectedNumbers.has(num)) {
+        selectedNumbers.add(num);
+        hotCount++;
+      }
+    }
+
+    // 2. Pick 1 Cold (from top 4 coldest)
+    const topCold = sortedByGap.slice(0, 4).sort(() => Math.random() - 0.5);
+    for (const [num] of topCold) {
+      if (!selectedNumbers.has(num)) {
+        selectedNumbers.add(num);
+        break;
+      }
+    }
+
+    // 3. Add 1 consecutive
+    for (const num of Array.from(selectedNumbers)) {
+      if (!selectedNumbers.has(num + 1) && num + 1 <= maxNumber) {
+        selectedNumbers.add(num + 1);
+        break;
+      } else if (!selectedNumbers.has(num - 1) && num - 1 >= 1) {
+        selectedNumbers.add(num - 1);
         break;
       }
     }
   }
 
-  // 4. Smart Fill (remaining numbers)
+  // Smart Fill remaining balls
   while (selectedNumbers.size < numBalls) {
     let currentSum = Array.from(selectedNumbers).reduce((a, b) => a + b, 0);
     let evenCount = Array.from(selectedNumbers).filter((n) => n % 2 === 0).length;
@@ -909,20 +1044,17 @@ export function predictVietlott(
       if (selectedNumbers.has(num)) continue;
 
       let score = 0;
-      // Prefer moving sum towards targetSum
       const newSum = currentSum + num;
-      const sumDiff = Math.abs(targetSum - (newSum + (maxNumber / 2) * (numBalls - 1 - selectedNumbers.size))); 
-      score -= sumDiff * 0.5; // Penalize deviation
+      const sumDiff = Math.abs(targetSum - (newSum + (maxNumber / 2) * (numBalls - 1 - selectedNumbers.size)));
+      score -= sumDiff * 0.5;
 
-      // Balance Even/Odd
       const isEven = num % 2 === 0;
       const targetEven = Math.floor(numBalls / 2);
       if (isEven && evenCount < targetEven + 1) score += 10;
       if (!isEven && oddCount < targetEven + 1) score += 10;
 
-      // Add a bit of randomness or frequency weight to break ties
       score += (freqMap.get(num) || 0) * 0.1;
-      score += Math.random() * 5; // Introduce randomness for diverse tickets
+      score += Math.random() * 5;
 
       if (score > bestScore) {
         bestScore = score;
@@ -949,19 +1081,51 @@ export function predictVietlott(
 
   let bonusNumber: number | undefined = undefined;
   if (type === '5/35') {
-    // 5/35 has a bonus number from 1-12. Randomly choose for now based on frequency logic if available.
-    // However, the main freq map is 1-35. We just pick a random 1-12 to be safe.
     bonusNumber = Math.floor(Math.random() * 12) + 1;
+  }
+
+  const strategyName =
+    strategy === 'hot'
+      ? 'Phong Độ Hot'
+      : strategy === 'cold'
+      ? 'Săn Gan Đột Phá'
+      : 'Cân Bằng Gauss';
+
+  let reasoning = `Chuẩn Gauss: Tổng ${sum}, Chẵn/Lẻ (${evenCount}/${oddCount})`;
+  if (strategy === 'hot') {
+    reasoning = `Bắt nhịp dây đỏ: Cụm số phong độ nổ cao nhất 30 kỳ qua (Tổng ${sum})`;
+  } else if (strategy === 'cold') {
+    reasoning = `Đột phá chu kỳ: Đón đầu các số nén chạm ngưỡng đảo chiều (Tổng ${sum})`;
   }
 
   return {
     numbers: finalNumbers,
     bonusNumber,
+    strategy,
+    strategyName,
     stats: {
       evenCount,
       oddCount,
       sum,
     },
-    reasoning: `Mix 2 Hot / 1 Gan / Cặp Tiến. Tổng ${sum}, Chẵn/Lẻ (${evenCount}/${oddCount})`,
+    reasoning,
+  };
+}
+
+/**
+ * Predicts all 3 strategies (Balanced, Hot, Cold) for a given Vietlott game.
+ */
+export function predictVietlottTickets(
+  draws: DrawRecord[],
+  type: '5/35' | '6/45' | '6/55'
+): {
+  balanced: VietlottPredictionTicket;
+  hot: VietlottPredictionTicket;
+  cold: VietlottPredictionTicket;
+} {
+  return {
+    balanced: predictVietlott(draws, type, 'balanced'),
+    hot: predictVietlott(draws, type, 'hot'),
+    cold: predictVietlott(draws, type, 'cold'),
   };
 }

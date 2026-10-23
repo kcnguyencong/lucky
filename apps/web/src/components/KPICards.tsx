@@ -176,8 +176,8 @@ export function KPICards({ summary }: KPICardsProps) {
         </div>
         <div className="flex items-center justify-around gap-2 my-2">
           {predictions.map((item, idx) => (
-            <div key={idx} className="flex flex-col items-center">
-              <span className="inline-flex items-center justify-center w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-300/30 text-white text-base font-extrabold rounded-xl shadow-md shadow-indigo-950/50">
+            <div key={idx} className="flex flex-col items-center group/ball relative" title={item.reasoning}>
+              <span className="inline-flex items-center justify-center w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-300/30 text-white text-base font-extrabold rounded-xl shadow-md shadow-indigo-950/50 cursor-pointer transition-transform group-hover/ball:scale-110">
                 {String(item.number).padStart(2, '0')}
               </span>
               <span className="text-xs text-indigo-300 font-semibold mt-1">{item.score}đ</span>
@@ -187,8 +187,8 @@ export function KPICards({ summary }: KPICardsProps) {
             <span className="text-xs text-slate-400">Đang tính toán...</span>
           )}
         </div>
-        <p className="text-xs text-indigo-400 mt-2 font-bold">
-          Dự báo ngày {nextDrawDateStr} • Song thủ lô
+        <p className="text-xs text-indigo-400 mt-2 font-medium truncate" title={predictions.map(p => `${String(p.number).padStart(2, '0')}: ${p.reasoning}`).join(' | ')}>
+          {predictions[0]?.reasoning ? `💡 ${predictions[0].reasoning}` : `Dự báo ngày ${nextDrawDateStr} • Song thủ lô`}
         </p>
       </div>
 
