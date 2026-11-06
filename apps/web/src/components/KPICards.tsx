@@ -32,6 +32,18 @@ interface KPICardsProps {
       score: number;
       reasoning: string;
     }>;
+    topPairPredictions?: Array<{
+      pair: [number, number];
+      pairLabel: string;
+      score: number;
+      probability: number;
+      currentGap: number;
+      recentGaps: number[];
+      totalHits30: number;
+      rhythmType: string;
+      rhythmTitle: string;
+      reasoning: string;
+    }>;
     lastDrawValidation?: {
       drawId: string;
       drawDate: string;
@@ -41,6 +53,18 @@ interface KPICardsProps {
         score: number;
         reasoning: string;
         isHit: boolean;
+      }>;
+      hitsCount: number;
+    } | null;
+    lastDrawPairValidation?: {
+      drawId: string;
+      drawDate: string;
+      pairs: Array<{
+        pair: [number, number];
+        pairLabel: string;
+        isHit: boolean;
+        hitNumbers: number[];
+        rhythmTitle: string;
       }>;
       hitsCount: number;
     } | null;

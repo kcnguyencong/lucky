@@ -52,6 +52,23 @@ export declare function predictTopNumbers(draws: DrawRecord[], topN?: number, ma
     score: number;
     reasoning: string;
 }>;
+export interface LotoPairPrediction {
+    pair: [number, number];
+    pairLabel: string;
+    score: number;
+    probability: number;
+    currentGap: number;
+    recentGaps: number[];
+    totalHits30: number;
+    rhythmType: 'STEP_2' | 'STEP_1' | 'STEP_3' | 'BREAKOUT' | 'CASCADE' | 'STABLE';
+    rhythmTitle: string;
+    reasoning: string;
+}
+/**
+ * Predicts the top pairs with the highest probability based on ketqua16-style 50-pair rhythm and frequency analysis.
+ * Partitions 100 numbers into 50 standard pairs (45 inverted pairs + 5 double pairs).
+ */
+export declare function predictTopLotoPairs(draws: DrawRecord[], topN?: number): LotoPairPrediction[];
 export interface SpecialPrizePrediction {
     type: 'CHAM_DAU' | 'CHAM_DUOI' | 'TONG';
     value: number;
@@ -105,6 +122,7 @@ export interface OverviewSummary {
         score: number;
         reasoning: string;
     }>;
+    topPairPredictions?: LotoPairPrediction[];
     specialPrizeSummary: SpecialPrizeSummary;
 }
 /**

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { KPICards } from '@/components/KPICards';
+import { LotoPairCards } from '@/components/LotoPairCards';
 import { VietlottCards } from '@/components/VietlottCards';
 import { DrawHistoryTable } from '@/components/DrawHistoryTable';
 import { RefreshCw, BarChart2 } from 'lucide-react';
@@ -95,6 +96,15 @@ export default function DashboardPage() {
 
         {/* Executive KPI Summary */}
         <KPICards summary={summary} />
+
+        {/* Top 2 Loto Pairs (ketqua16 Rhythm & Frequency) */}
+        {summary?.topPairPredictions && (
+          <LotoPairCards
+            pairs={summary.topPairPredictions}
+            validation={summary.lastDrawPairValidation}
+            drawDate={summary.latestDraw?.drawDate}
+          />
+        )}
 
         {/* Vietlott Section */}
         {vietlott && <VietlottCards data={vietlott} />}

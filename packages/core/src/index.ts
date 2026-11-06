@@ -415,6 +415,188 @@ export function predictTopNumbers(
   return selected;
 }
 
+export interface LotoPairPrediction {
+  pair: [number, number];
+  pairLabel: string;
+  score: number;
+  probability: number;
+  currentGap: number;
+  recentGaps: number[];
+  totalHits30: number;
+  rhythmType: 'STEP_2' | 'STEP_1' | 'STEP_3' | 'BREAKOUT' | 'CASCADE' | 'STABLE';
+  rhythmTitle: string;
+  reasoning: string;
+}
+
+/**
+ * Predicts the top pairs with the highest probability based on ketqua16-style 50-pair rhythm and frequency analysis.
+ * Partitions 100 numbers into 50 standard pairs (45 inverted pairs + 5 double pairs).
+ */
+export function predictTopLotoPairs(
+  draws: DrawRecord[],
+  topN: number = 2
+): LotoPairPrediction[] {
+  if (draws.length === 0) return [];
+
+  // Sort draws newest-first
+  const sortedDesc = [...draws].sort(
+    (a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()
+  );
+
+  // Generate 50 standard pairs
+  const pairs: [number, number][] = [];
+  for (let a = 0; a <= 8; a++) {
+    for (let b = a + 1; b <= 9; b++) {
+      pairs.push([a * 10 + b, b * 10 + a]);
+    }
+  }
+  pairs.push([0, 55], [11, 66], [22, 77], [33, 88], [44, 99]);
+
+  // Analyze latest draw for mute heads/tails
+  const latestNumbers = new Set(sortedDesc[0].numbers);
+  const latestHeads = new Array(10).fill(0);
+  const latestTails = new Array(10).fill(0);
+  latestNumbers.forEach((n) => {
+    latestHeads[Math.floor(n / 10)]++;
+    latestTails[n % 10]++;
+  });
+  const muteHeads = new Set<number>();
+  const muteTails = new Set<number>();
+  for (let i = 0; i < 10; i++) {
+    if (latestHeads[i] === 0) muteHeads.add(i);
+    if (latestTails[i] === 0) muteTails.add(i);
+  }
+
+  const window30 = Math.min(30, sortedDesc.length);
+
+  const pairStats: LotoPairPrediction[] = pairs.map(([n1, n2]) => {
+    const hitIndices: number[] = [];
+    sortedDesc.forEach((draw, idx) => {
+      if (draw.numbers.includes(n1) || draw.numbers.includes(n2)) {
+        hitIndices.push(idx);
+      }
+    });
+
+    const totalHits30 = hitIndices.filter((idx) => idx < window30).length;
+    const currentGap = hitIndices.length > 0 ? hitIndices[0] : sortedDesc.length;
+
+    const recentGaps: number[] = [];
+    for (let i = 0; i < Math.min(hitIndices.length - 1, 5); i++) {
+      recentGaps.push(hitIndices[i + 1] - hitIndices[i] - 1);
+    }
+
+    let maxGap = 0;
+    if (hitIndices.length > 0) {
+      maxGap = hitIndices[0];
+      for (let i = 0; i < hitIndices.length - 1; i++) {
+        const g = hitIndices[i + 1] - hitIndices[i] - 1;
+        if (g > maxGap) maxGap = g;
+      }
+      const tailGap = sortedDesc.length - 1 - hitIndices[hitIndices.length - 1];
+      if (tailGap > maxGap) maxGap = tailGap;
+    } else {
+      maxGap = sortedDesc.length;
+    }
+
+    // Rhythm scoring
+    let rhythmScore = 0;
+    let rhythmType: LotoPairPrediction['rhythmType'] = 'STABLE';
+    let rhythmTitle = 'Phong độ bình ổn';
+    let reasoning = '';
+
+    const g1 = recentGaps[0];
+    const g2 = recentGaps[1];
+
+    if (currentGap === 2) {
+      if (g1 === 2 || g1 === 1) {
+        rhythmScore = 38;
+        rhythmType = 'STEP_2';
+        rhythmTitle = '🎯 Nhịp 2 ngày chuẩn chu kỳ (Điểm rơi vàng)';
+        reasoning = `Cặp số duy trì nhịp nổ cách 1-2 ngày rất đều (vừa nghỉ 2 ngày, chạm điểm rơi nổ)`;
+      } else {
+        rhythmScore = 28;
+        rhythmType = 'STEP_2';
+        rhythmTitle = 'Nhịp 2 ngày';
+        reasoning = `Nghỉ 2 ngày sau kỳ nổ trước, xác suất xuất hiện cao`;
+      }
+    } else if (currentGap === 1) {
+      if (g1 === 1 || g2 === 1) {
+        rhythmScore = 35;
+        rhythmType = 'STEP_1';
+        rhythmTitle = '⚡ Nhịp so-le cách 1 ngày';
+        reasoning = `Đang chạy nhịp so-le đều đặn (ra 1 ngày - nghỉ 1 ngày)`;
+      } else {
+        rhythmScore = 25;
+        rhythmType = 'STEP_1';
+        rhythmTitle = 'Nhịp nghỉ 1 ngày';
+        reasoning = `Nghỉ 1 ngày sau kỳ nổ trước`;
+      }
+    } else if (currentGap === 3) {
+      rhythmScore = 26;
+      rhythmType = 'STEP_3';
+      rhythmTitle = 'Nhịp 3 ngày';
+      reasoning = `Điểm rơi chu kỳ 3 ngày`;
+    } else if (currentGap >= 4 && currentGap <= 7) {
+      if (currentGap >= maxGap * 0.7) {
+        rhythmScore = 32;
+        rhythmType = 'BREAKOUT';
+        rhythmTitle = '💥 Săn bùng nổ thoát gan';
+        reasoning = `Cặp số nén ${currentGap} ngày (chuẩn bị chạm ngưỡng gan cực đại ${maxGap} ngày), lực bật rất mạnh`;
+      } else {
+        rhythmScore = 18;
+        rhythmType = 'BREAKOUT';
+        rhythmTitle = 'Nhịp hồi phục';
+        reasoning = `Đang trong chu kỳ nén ${currentGap} ngày`;
+      }
+    } else if (currentGap === 0) {
+      rhythmScore = 16;
+      rhythmType = 'CASCADE';
+      rhythmTitle = '♻️ Nhịp rơi liên tiếp';
+      reasoning = `Bắt nhịp rơi tiếp nối từ kỳ trước`;
+    } else {
+      rhythmScore = -30;
+      reasoning = `Cặp đang gan sâu (${currentGap} ngày), rủi ro cao`;
+    }
+
+    // Frequency Score (Max 30)
+    const freqScore = Math.min(30, (totalHits30 / 14) * 30);
+
+    // Mute Head/Tail Bonus (Max 20)
+    let muteBonus = 0;
+    const h1 = Math.floor(n1 / 10),
+      t1 = n1 % 10;
+    const h2 = Math.floor(n2 / 10),
+      t2 = n2 % 10;
+    if (muteHeads.has(h1) || muteHeads.has(h2)) muteBonus += 10;
+    if (muteTails.has(t1) || muteTails.has(t2)) muteBonus += 10;
+    if (muteBonus > 0) {
+      reasoning += ` • Hưởng lợi từ Cầu câm (${muteHeads.size > 0 ? 'Đầu câm' : ''} ${muteTails.size > 0 ? 'Đuôi câm' : ''})`;
+    }
+
+    const totalScore = Number((rhythmScore + freqScore + muteBonus).toFixed(1));
+    const probability = Math.min(94, Math.max(70, Math.round(72 + (totalScore / 85) * 22)));
+
+    const p1 = String(n1).padStart(2, '0');
+    const p2 = String(n2).padStart(2, '0');
+
+    return {
+      pair: [n1, n2],
+      pairLabel: `${p1} - ${p2}`,
+      score: totalScore,
+      probability,
+      currentGap,
+      recentGaps,
+      totalHits30,
+      rhythmType,
+      rhythmTitle,
+      reasoning,
+    };
+  });
+
+  pairStats.sort((a, b) => b.score - a.score);
+  return pairStats.slice(0, topN);
+}
+
 export interface SpecialPrizePrediction {
   type: 'CHAM_DAU' | 'CHAM_DUOI' | 'TONG';
   value: number;
@@ -460,6 +642,7 @@ export interface OverviewSummary {
     score: number;
     reasoning: string;
   }>;
+  topPairPredictions?: LotoPairPrediction[];
   specialPrizeSummary: SpecialPrizeSummary;
 }
 
@@ -855,6 +1038,7 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
       coldestNumber: null,
       mostLaggingNumber: null,
       topPredictions: [],
+      topPairPredictions: [],
       specialPrizeSummary: {
         topChamPredictions: [],
         topTongPredictions: [],
@@ -868,6 +1052,7 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
   const freqStats = calculateFrequencyStats(draws);
   const gapStats = calculateGapStats(draws);
   const predictions = predictTopNumbers(draws, 2);
+  const topPairPredictions = predictTopLotoPairs(draws, 2);
 
   const sortedByAppearances = [...freqStats].sort((a, b) => b.appearances - a.appearances);
   const sortedByGap = [...gapStats].sort((a, b) => b.currentGap - a.currentGap);
@@ -879,6 +1064,7 @@ export function generateOverviewSummary(draws: DrawRecord[]): OverviewSummary {
     coldestNumber: sortedByAppearances[sortedByAppearances.length - 1] || null,
     mostLaggingNumber: sortedByGap[0] || null,
     topPredictions: predictions,
+    topPairPredictions,
     specialPrizeSummary: calculateSpecialPrizeStats(draws),
   };
 }
