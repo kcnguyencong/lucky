@@ -7,58 +7,57 @@ let cachedDraws: DrawRecord[] | null = null;
 let lastFetchTime: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
-function parseHTML(html: string): DrawRecord[] {
+function parseXosoHTML(html: string): DrawRecord[] {
   const $ = cheerio.load(html);
   const results: DrawRecord[] = [];
 
-  $('#result_tab_mb').each((idx, table) => {
-    const $table = $(table);
-    
-    // 1. Extract date (e.g. "Thứ hai ngày 03-08-2026")
-    const dateText = $table.find('#result_date').text().trim();
-    let drawDateStr = new Date().toISOString();
-    if (dateText) {
-      const match = dateText.match(/(\d{2})-(\d{2})-(\d{4})/);
-      if (match) {
-        const [_, day, month, year] = match;
-        drawDateStr = new Date(`${year}-${month}-${day}T18:30:00.000Z`).toISOString();
-      }
-    }
+  $('.section-content').each((idx, content) => {
+    const $content = $(content);
+    const table = $content.find('table.table-result');
+    if (table.length === 0) return;
 
-    const dateKey = drawDateStr.substring(0, 10).replace(/-/g, '');
-    const drawId = `MB-${dateKey}`;
+    const headerText =
+      $content.prevAll('header.section-header').first().text().trim() ||
+      $content.closest('section').find('header.section-header').first().text().trim();
+
+    const dateMatch = headerText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!dateMatch) return;
+
+    const [fullMatch, day, month, year] = dateMatch;
+    const drawDateStr = `${year}-${month}-${day}T18:30:00.000Z`;
+    const drawId = `MB-${year}${month}${day}`;
 
     const numbers: number[] = [];
     let specialNumber: number | null = null;
 
-    // Special prize (rs_0_0)
-    const specialText = $table.find('#rs_0_0').text().trim();
-    if (specialText && specialText.length >= 2) {
-      const dbLotto = parseInt(specialText.slice(-2), 10);
-      if (!isNaN(dbLotto)) {
-        specialNumber = dbLotto;
-        numbers.push(dbLotto);
-      }
-    }
+    table.find('tr').each((rIdx, tr) => {
+      const rowText = $(tr).text().trim();
+      const isDb = rowText.startsWith('ĐB') || $(tr).find('td:first-child').text().includes('ĐB');
 
-    // All other prizes (2-digit tail)
-    $table.find('div[id^="rs_"]').each((_, numDiv) => {
-      const numText = $(numDiv).text().trim();
-      if (numText && numText.length >= 2 && !$(numDiv).attr('id')?.startsWith('rs_8')) {
-        const lottoNum = parseInt(numText.slice(-2), 10);
-        if (!isNaN(lottoNum)) {
-          numbers.push(lottoNum);
-        }
-      }
+      $(tr).find('td').each((cIdx, td) => {
+        const text = $(td).text().trim();
+        const tokens = text.split(/\s+/);
+        tokens.forEach((tok) => {
+          if (/^\d{2,5}$/.test(tok)) {
+            const num = parseInt(tok.slice(-2), 10);
+            if (!isNaN(num)) {
+              numbers.push(num);
+              if (isDb && specialNumber === null) {
+                specialNumber = num;
+              }
+            }
+          }
+        });
+      });
     });
 
-    if (numbers.length > 0) {
+    if (numbers.length >= 20) {
       results.push({
         id: drawId,
-        drawId: drawId,
+        drawId,
         lotteryType: 'XSMB',
         drawDate: drawDateStr,
-        numbers: numbers,
+        numbers,
         bonusNumber: specialNumber,
       });
     }
@@ -69,7 +68,7 @@ function parseHTML(html: string): DrawRecord[] {
 
 export async function getMergedDraws(forceRefresh = false): Promise<DrawRecord[]> {
   const now = Date.now();
-  if (!forceRefresh && cachedDraws && (now - lastFetchTime < CACHE_TTL)) {
+  if (!forceRefresh && cachedDraws && now - lastFetchTime < CACHE_TTL) {
     return cachedDraws;
   }
 
@@ -89,19 +88,19 @@ export async function getMergedDraws(forceRefresh = false): Promise<DrawRecord[]
   });
   const baseDraws = Array.from(baseDrawsMap.values());
 
-
   try {
-    console.log('[LiveScraper] Fetching latest draws from mketqua.net...');
-    const response = await axios.get('https://mketqua.net/so-ket-qua', {
-      timeout: 5000,
+    console.log('[LiveScraper] Fetching latest draws from xoso.com.vn...');
+    const response = await axios.get('https://xoso.com.vn/xo-so-mien-bac/xsmb-p1.html', {
+      timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/125.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-      }
+      },
     });
 
-    const liveDraws = parseHTML(response.data);
+    const liveDraws = parseXosoHTML(response.data);
     console.log(`[LiveScraper] Scraped ${liveDraws.length} live draws.`);
 
     // Merge logic: append live draws that do not exist in static draws
@@ -123,12 +122,14 @@ export async function getMergedDraws(forceRefresh = false): Promise<DrawRecord[]
     lastFetchTime = now;
     return merged;
   } catch (error: any) {
-    console.error('[LiveScraper Error] Failed to scrape latest draws, falling back to static cache:', error.message);
-    
+    console.error(
+      '[LiveScraper Error] Failed to scrape latest draws, falling back to static cache:',
+      error.message
+    );
+
     // Sort descending by drawDate
     baseDraws.sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
-    
-    // Fallback to static draws if live fetch fails and no cache exists
+
     if (!cachedDraws) {
       cachedDraws = baseDraws;
       lastFetchTime = now;
