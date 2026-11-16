@@ -41,13 +41,47 @@ export function LotoPairCards({ pairs, validation, drawDate }: LotoPairCardsProp
   const primaryPair = pairs[0];
   const secondaryPair = pairs.length > 1 ? pairs[1] : null;
 
+  const primaryResult = validation?.pairs?.[0];
+  const secondaryResult = validation?.pairs?.[1];
+
+  const validationBadge = (() => {
+    if (!validation) return null;
+    const drawCode = validation.drawId.replace('MB-', '');
+
+    if (primaryResult?.isHit && primaryResult.hitNumbers.length > 0) {
+      const hitStr = primaryResult.hitNumbers.map((n) => String(n).padStart(2, '0')).join(', ');
+      return {
+        style: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 shadow-emerald-950/30',
+        icon: <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />,
+        text: `Kỳ #${drawCode}: Ăn con ${hitStr} (Bạch thủ ${primaryResult.pairLabel})`,
+      };
+    }
+
+    if (secondaryResult?.isHit && secondaryResult.hitNumbers.length > 0) {
+      const hitStr = secondaryResult.hitNumbers.map((n) => String(n).padStart(2, '0')).join(', ');
+      return {
+        style: 'bg-amber-500/15 border-amber-500/30 text-amber-300 shadow-amber-950/30',
+        icon: <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />,
+        text: `Kỳ #${drawCode}: Ăn lót ${hitStr} (Cặp chính ${primaryResult?.pairLabel || ''} trượt)`,
+      };
+    }
+
+    return {
+      style: 'bg-rose-500/15 border-rose-500/30 text-rose-300 shadow-rose-950/30',
+      icon: <XCircle className="w-4 h-4 text-rose-400 shrink-0" />,
+      text: `Kỳ #${drawCode}: Trượt (Không nổ)`,
+    };
+  })();
+
   const nextDrawDateStr = (() => {
     if (!drawDate) return 'Hôm nay';
     try {
-      const d = new Date(drawDate);
-      if (isNaN(d.getTime())) return 'Hôm nay';
-      d.setDate(d.getDate() + 1);
-      return d.toLocaleDateString('vi-VN', {
+      const match = drawDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return 'Hôm nay';
+      const [_, y, m, d] = match;
+      const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+      dateObj.setDate(dateObj.getDate() + 1);
+      return dateObj.toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -97,25 +131,12 @@ export function LotoPairCards({ pairs, validation, drawDate }: LotoPairCardsProp
         </div>
 
         {/* Validation badge for last draw */}
-        {validation && (
+        {validationBadge && (
           <div
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border backdrop-blur-md shadow-md text-xs font-bold ${
-              validation.hitsCount > 0
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 shadow-emerald-950/30'
-                : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
-            }`}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border backdrop-blur-md shadow-md text-xs font-bold ${validationBadge.style}`}
           >
-            {validation.hitsCount > 0 ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <XCircle className="w-4 h-4 text-slate-500" />
-            )}
-            <span>
-              Kỳ #{validation.drawId.replace('MB-', '')}:{' '}
-              {validation.hitsCount > 0
-                ? `Ăn ${validation.pairs[0]?.hitNumbers.map((n) => String(n).padStart(2, '0')).join(', ')}`
-                : 'Trượt'}
-            </span>
+            {validationBadge.icon}
+            <span>{validationBadge.text}</span>
           </div>
         )}
       </div>
